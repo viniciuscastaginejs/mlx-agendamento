@@ -6,21 +6,29 @@
   <title>MLX Mind — Agendamento</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Syne:wght@400;500;600;700&family=DM+Sans:wght@300;400;500&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --purple-900: #26215C; --purple-800: #3C3489; --purple-600: #534AB7;
       --purple-400: #7F77DD; --purple-200: #AFA9EC; --purple-100: #CECBF6;
-      --purple-50: #EEEDFE; --bg: #0f0d2a; --surface: #1a1640;
-      --surface2: #231e52; --text: #f0eeff; --muted: #9990cc;
-      --border: rgba(175,169,236,0.15);
+      --bg: #0f0d2a; --surface: #1a1640; --surface2: #231e52;
+      --text: #f0eeff; --muted: #9990cc; --border: rgba(175,169,236,0.15);
     }
     html, body { height: 100%; }
     body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
-
     .app { min-height: 100vh; position: relative; }
 
-    /* HEADER */
+    #bg-canvas {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      z-index: 0;
+      pointer-events: none;
+    }
+
+    .header, .content { position: relative; z-index: 1; }
+
     .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 16px 24px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 50; }
     .logo { font-family: 'Syne', sans-serif; font-weight: 700; font-size: 20px; color: var(--purple-100); letter-spacing: -0.5px; }
     .logo span { color: var(--purple-400); }
@@ -29,18 +37,13 @@
     .nav-btn.active { background: var(--purple-800); color: var(--purple-100); }
     .nav-btn:hover:not(.active) { background: rgba(127,119,221,0.12); color: var(--text); }
 
-    /* CONTENT */
     .content { padding: 32px 24px; max-width: 680px; margin: 0 auto; }
-
-    .form-section { display: none; }
-    .list-section { display: none; }
-    .form-section.active { display: block; }
-    .list-section.active { display: block; }
+    .form-section { display: none; } .list-section { display: none; }
+    .form-section.active { display: block; } .list-section.active { display: block; }
 
     .section-title { font-family: 'Syne', sans-serif; font-size: 22px; font-weight: 600; color: var(--purple-100); margin-bottom: 6px; }
     .section-sub { font-size: 14px; color: var(--muted); margin-bottom: 28px; }
 
-    /* FORM CARD */
     .form-card { background: var(--surface); border: 1px solid var(--border); border-radius: 16px; padding: 28px; }
     .form-group { margin-bottom: 18px; }
     .form-label { font-size: 11px; font-weight: 500; color: var(--muted); text-transform: uppercase; letter-spacing: 0.6px; margin-bottom: 7px; display: block; }
@@ -60,14 +63,13 @@
 
     .btn-primary { width: 100%; background: var(--purple-600); border: none; border-radius: 10px; padding: 13px; font-family: 'Syne', sans-serif; font-size: 15px; font-weight: 600; color: white; cursor: pointer; margin-top: 8px; transition: background 0.2s; letter-spacing: 0.3px; }
     .btn-primary:hover { background: var(--purple-800); }
+    .btn-primary:disabled { opacity: 0.5; cursor: not-allowed; }
 
-    /* STATS */
     .stats-row { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 28px; }
     .stat-card { background: var(--surface); border: 1px solid var(--border); border-radius: 14px; padding: 18px; }
     .stat-val { font-family: 'Syne', sans-serif; font-size: 30px; font-weight: 700; color: var(--purple-400); }
     .stat-label { font-size: 12px; color: var(--muted); margin-top: 4px; }
 
-    /* LIST */
     .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
     .filter-row { display: flex; gap: 6px; }
     .filter-btn { background: var(--surface2); border: 1px solid var(--border); padding: 6px 14px; border-radius: 20px; font-size: 12px; color: var(--muted); cursor: pointer; transition: all 0.2s; font-family: 'DM Sans', sans-serif; }
@@ -100,22 +102,24 @@
     .tag-past { font-size: 10px; padding: 2px 8px; background: rgba(136,135,128,0.2); color: var(--muted); border-radius: 20px; margin-left: 6px; }
 
     .empty-state { text-align: center; padding: 56px 24px; color: var(--muted); font-size: 14px; line-height: 1.8; }
+    .loading-state { text-align: center; padding: 40px; color: var(--muted); font-size: 14px; }
 
-    /* TOAST */
-    .toast { position: fixed; top: 20px; right: 20px; background: var(--purple-800); color: var(--purple-100); padding: 14px 20px; border-radius: 12px; font-size: 14px; font-weight: 500; display: none; z-index: 200; border: 1px solid var(--purple-600); box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+    .toast { position: fixed; top: 20px; right: 20px; padding: 14px 20px; border-radius: 12px; font-size: 14px; font-weight: 500; display: none; z-index: 200; box-shadow: 0 8px 32px rgba(0,0,0,0.4); }
+    .toast.success { background: var(--purple-800); color: var(--purple-100); border: 1px solid var(--purple-600); }
+    .toast.error { background: #3d1515; color: #f09595; border: 1px solid #a32d2d; }
 
     @media (max-width: 480px) {
       .content { padding: 20px 16px; }
       .row2 { grid-template-columns: 1fr; }
-      .stats-row { grid-template-columns: repeat(3,1fr); }
       .stat-val { font-size: 22px; }
       .header { padding: 14px 16px; }
     }
   </style>
 </head>
 <body>
+<canvas id="bg-canvas"></canvas>
 <div class="app">
-  <div class="toast" id="toast">✓ Reunião agendada com sucesso!</div>
+  <div class="toast" id="toast"></div>
 
   <div class="header">
     <div class="logo">MLX <span>MIND</span></div>
@@ -127,7 +131,6 @@
 
   <div class="content">
 
-    <!-- FORMULÁRIO -->
     <div class="form-section active" id="formView">
       <div class="section-title">Nova reunião</div>
       <div class="section-sub">Preencha os dados abaixo para agendar</div>
@@ -147,12 +150,10 @@
             </div>
           </div>
         </div>
-
         <div class="form-group">
           <label class="form-label">Nome do cliente / contato *</label>
           <input class="form-input" id="fName" type="text" placeholder="Ex: João Silva">
         </div>
-
         <div class="row2">
           <div class="form-group">
             <label class="form-label">Telefone *</label>
@@ -163,7 +164,6 @@
             <input class="form-input" id="fEmail" type="email" placeholder="email@exemplo.com">
           </div>
         </div>
-
         <div class="row2">
           <div class="form-group">
             <label class="form-label">Data *</label>
@@ -174,33 +174,20 @@
             <input class="form-input" id="fTime" type="time">
           </div>
         </div>
-
         <div class="form-group">
           <label class="form-label">Observações (opcional)</label>
           <input class="form-input" id="fObs" type="text" placeholder="Ex: Apresentar proposta de tráfego pago">
         </div>
-
-        <button class="btn-primary" onclick="saveMeeting()">Confirmar agendamento</button>
+        <button class="btn-primary" id="btnSave" onclick="saveMeeting()">Confirmar agendamento</button>
       </div>
     </div>
 
-    <!-- LISTA -->
     <div class="list-section" id="listView">
       <div class="stats-row">
-        <div class="stat-card">
-          <div class="stat-val" id="statTotal">0</div>
-          <div class="stat-label">Total agendado</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-val" id="statProx">0</div>
-          <div class="stat-label">Próximas</div>
-        </div>
-        <div class="stat-card">
-          <div class="stat-val" id="statToday">0</div>
-          <div class="stat-label">Hoje</div>
-        </div>
+        <div class="stat-card"><div class="stat-val" id="statTotal">—</div><div class="stat-label">Total agendado</div></div>
+        <div class="stat-card"><div class="stat-val" id="statProx">—</div><div class="stat-label">Próximas</div></div>
+        <div class="stat-card"><div class="stat-val" id="statToday">—</div><div class="stat-label">Hoje</div></div>
       </div>
-
       <div class="section-header">
         <div class="section-title" style="margin-bottom:0;">Agenda</div>
         <div class="filter-row">
@@ -209,9 +196,8 @@
           <button class="filter-btn" onclick="setFilter('meet',this)">Meet</button>
         </div>
       </div>
-
       <div class="meeting-list" id="meetingList">
-        <div class="empty-state">Nenhuma reunião agendada ainda.<br>Use a aba "Agendar" para criar a primeira.</div>
+        <div class="loading-state">Carregando reuniões...</div>
       </div>
     </div>
 
@@ -219,25 +205,37 @@
 </div>
 
 <script>
-  const STORAGE_KEY = 'mlx_meetings';
+  const SUPABASE_URL = 'https://txclxnfrqzcdxqfqygeq.supabase.co';
+  const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InR4Y2x4bmZycXpjZHhxZnF5Z2VxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzU1NjgwMzUsImV4cCI6MjA5MTE0NDAzNX0.fycGOcFseNKBz7OVfsbumk5mWzxF09Xb2YWEn3iDmRE';
+  const sb = supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
   let meetings = [];
   let selectedType = 'ligacao';
   let currentFilter = 'todas';
-
   const todayStr = new Date().toISOString().split('T')[0];
+
   document.getElementById('fDate').value = todayStr;
   document.getElementById('fDate').min = todayStr;
   document.getElementById('fTime').value = '09:00';
 
-  function load() {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      meetings = raw ? JSON.parse(raw) : [];
-    } catch(e) { meetings = []; }
+  function showToast(msg, type = 'success') {
+    const t = document.getElementById('toast');
+    t.textContent = msg;
+    t.className = 'toast ' + type;
+    t.style.display = 'block';
+    setTimeout(() => { t.style.display = 'none'; }, 3000);
   }
 
-  function persist() {
-    try { localStorage.setItem(STORAGE_KEY, JSON.stringify(meetings)); } catch(e) {}
+  async function loadMeetings() {
+    document.getElementById('meetingList').innerHTML = '<div class="loading-state">Carregando...</div>';
+    const { data, error } = await sb
+      .from('reunioes')
+      .select('*')
+      .order('date', { ascending: true })
+      .order('time', { ascending: true });
+    if (error) { showToast('Erro ao carregar reuniões.', 'error'); return; }
+    meetings = data || [];
+    renderList();
   }
 
   function setView(v) {
@@ -246,7 +244,7 @@
     document.querySelectorAll('.nav-btn').forEach((b, i) => {
       b.classList.toggle('active', (i === 0 && v === 'form') || (i === 1 && v === 'list'));
     });
-    if (v === 'list') renderList();
+    if (v === 'list') loadMeetings();
   }
 
   function selectType(t) {
@@ -255,7 +253,7 @@
     document.getElementById('tc-' + t).classList.add('selected');
   }
 
-  function saveMeeting() {
+  async function saveMeeting() {
     const name  = document.getElementById('fName').value.trim();
     const phone = document.getElementById('fPhone').value.trim();
     const email = document.getElementById('fEmail').value.trim();
@@ -263,13 +261,23 @@
     const time  = document.getElementById('fTime').value;
     const obs   = document.getElementById('fObs').value.trim();
 
-    if (!name)        { alert('Informe o nome do contato.'); return; }
-    if (!phone)       { alert('Informe o telefone.'); return; }
-    if (!date || !time) { alert('Informe data e horário.'); return; }
+    if (!name)          { showToast('Informe o nome do contato.', 'error'); return; }
+    if (!phone)         { showToast('Informe o telefone.', 'error'); return; }
+    if (!date || !time) { showToast('Informe data e horário.', 'error'); return; }
 
-    meetings.push({ id: Date.now(), type: selectedType, name, phone, email, date, time, obs });
-    meetings.sort((a, b) => (a.date + a.time).localeCompare(b.date + b.time));
-    persist();
+    const btn = document.getElementById('btnSave');
+    btn.disabled = true;
+    btn.textContent = 'Salvando...';
+
+    const { error } = await sb.from('reunioes').insert([{
+      type: selectedType, name, phone,
+      email: email || null, date, time, obs: obs || null
+    }]);
+
+    btn.disabled = false;
+    btn.textContent = 'Confirmar agendamento';
+
+    if (error) { showToast('Erro ao salvar. Tente novamente.', 'error'); console.error(error); return; }
 
     document.getElementById('fName').value  = '';
     document.getElementById('fPhone').value = '';
@@ -278,17 +286,15 @@
     document.getElementById('fDate').value  = todayStr;
     document.getElementById('fTime').value  = '09:00';
 
-    const toast = document.getElementById('toast');
-    toast.style.display = 'block';
-    setTimeout(() => { toast.style.display = 'none'; }, 2500);
-
+    showToast('✓ Reunião agendada com sucesso!');
     setView('list');
   }
 
-  function deleteMeeting(id) {
+  async function deleteMeeting(id) {
     if (!confirm('Remover esta reunião?')) return;
+    const { error } = await sb.from('reunioes').delete().eq('id', id);
+    if (error) { showToast('Erro ao remover.', 'error'); return; }
     meetings = meetings.filter(m => m.id !== id);
-    persist();
     renderList();
   }
 
@@ -327,10 +333,10 @@
     upcoming.forEach(m => list.appendChild(createCard(m, false)));
 
     if (past.length > 0) {
-      const div = document.createElement('div');
-      div.className = 'past-label';
-      div.textContent = 'realizadas';
-      list.appendChild(div);
+      const sep = document.createElement('div');
+      sep.className = 'past-label';
+      sep.textContent = 'realizadas';
+      list.appendChild(sep);
       past.forEach(m => list.appendChild(createCard(m, true)));
     }
   }
@@ -359,8 +365,116 @@
     return div;
   }
 
-  load();
-  renderList();
+  loadMeetings();
+</script>
+<script>
+  (function() {
+    const canvas = document.getElementById('bg-canvas');
+    const ctx = canvas.getContext('2d');
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    const COLORS = ['#534AB7','#7F77DD','#3C3489','#AFA9EC','#26215C'];
+
+    // Orbs flutuantes grandes
+    const orbs = Array.from({length: 5}, (_, i) => ({
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * window.innerHeight,
+      r: 180 + Math.random() * 220,
+      color: COLORS[i % COLORS.length],
+      vx: (Math.random() - 0.5) * 0.3,
+      vy: (Math.random() - 0.5) * 0.3,
+      phase: Math.random() * Math.PI * 2
+    }));
+
+    // Partículas pequenas
+    const particles = Array.from({length: 60}, () => ({
+      x: Math.random() * window.innerWidth,
+      y: Math.random() * window.innerHeight,
+      r: 1 + Math.random() * 2,
+      alpha: 0.2 + Math.random() * 0.5,
+      vx: (Math.random() - 0.5) * 0.4,
+      vy: -0.2 - Math.random() * 0.5,
+      color: COLORS[Math.floor(Math.random() * COLORS.length)]
+    }));
+
+    // Linhas conectoras entre partículas próximas
+    const MAX_DIST = 120;
+
+    let t = 0;
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      // Fundo base
+      ctx.fillStyle = '#0f0d2a';
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+      // Orbs com blur suave
+      orbs.forEach(o => {
+        o.x += o.vx;
+        o.y += o.vy;
+        o.phase += 0.005;
+        const pulse = Math.sin(o.phase) * 20;
+
+        if (o.x < -o.r) o.x = canvas.width + o.r;
+        if (o.x > canvas.width + o.r) o.x = -o.r;
+        if (o.y < -o.r) o.y = canvas.height + o.r;
+        if (o.y > canvas.height + o.r) o.y = -o.r;
+
+        const grad = ctx.createRadialGradient(o.x, o.y, 0, o.x, o.y, o.r + pulse);
+        grad.addColorStop(0, o.color + '22');
+        grad.addColorStop(0.5, o.color + '0a');
+        grad.addColorStop(1, 'transparent');
+        ctx.beginPath();
+        ctx.arc(o.x, o.y, o.r + pulse, 0, Math.PI * 2);
+        ctx.fillStyle = grad;
+        ctx.fill();
+      });
+
+      // Partículas
+      particles.forEach(p => {
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.y < -5) { p.y = canvas.height + 5; p.x = Math.random() * canvas.width; }
+        if (p.x < -5) p.x = canvas.width + 5;
+        if (p.x > canvas.width + 5) p.x = -5;
+
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = p.color + Math.floor(p.alpha * 255).toString(16).padStart(2,'0');
+        ctx.fill();
+      });
+
+      // Linhas conectoras
+      ctx.lineWidth = 0.4;
+      for (let i = 0; i < particles.length; i++) {
+        for (let j = i + 1; j < particles.length; j++) {
+          const dx = particles[i].x - particles[j].x;
+          const dy = particles[i].y - particles[j].y;
+          const dist = Math.sqrt(dx*dx + dy*dy);
+          if (dist < MAX_DIST) {
+            const alpha = (1 - dist / MAX_DIST) * 0.15;
+            ctx.strokeStyle = `rgba(127,119,221,${alpha})`;
+            ctx.beginPath();
+            ctx.moveTo(particles[i].x, particles[i].y);
+            ctx.lineTo(particles[j].x, particles[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      t++;
+      requestAnimationFrame(draw);
+    }
+
+    draw();
+  })();
 </script>
 </body>
 </html>
