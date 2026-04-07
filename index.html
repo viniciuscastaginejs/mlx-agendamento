@@ -421,7 +421,7 @@
     btn.disabled=true; btn.textContent='Entrando...';
     const { data, error } = await sb.auth.signInWithPassword({ email, password: pass });
     btn.disabled=false; btn.textContent='Entrar';
-    if(error){ errEl.textContent='E-mail ou senha incorretos.'; return; }
+    if(error){ errEl.textContent=error.message; return; }
     if(remember) localStorage.setItem('mlx_email', email);
     else localStorage.removeItem('mlx_email');
     showApp(data.user.email);
