@@ -760,12 +760,6 @@
   document.getElementById('hdr-day').textContent = String(now.getDate()).padStart(2,'0');
   document.getElementById('hdr-month').textContent = now.toLocaleDateString('pt-BR', { weekday: 'long', month: 'long', year: 'numeric' });
 
-  // Pre-load the task from the user's note
-  if (tasks.length === 0) {
-    tasks.push({ id: nextId++, text: 'Terminar site dantas', time: '', tag: 'work', done: false });
-    save();
-  }
-
   render();
 
   document.getElementById('input-task').addEventListener('keydown', e => {
