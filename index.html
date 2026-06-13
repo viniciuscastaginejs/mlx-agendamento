@@ -73,6 +73,7 @@ button{font-family:inherit;cursor:pointer;border:0;color:inherit;background:none
   padding:6px 12px;border-radius:999px;backdrop-filter:blur(4px);white-space:nowrap;
 }
 .chip b{color:#ffd66b}
+.chip.perigo{background:rgba(216,55,46,.85);border-color:#ff8a80;animation:piscar .5s steps(2) infinite}
 
 /* ---------- Telas (overlays) ---------- */
 .tela{
@@ -302,6 +303,7 @@ button{font-family:inherit;cursor:pointer;border:0;color:inherit;background:none
   <div class="hud-sub">
     <span class="chip" id="hudNivel">⭐ Nível 1</span>
     <span class="chip" id="hudRec">🏆 0 m</span>
+    <span class="chip" id="hudAlien">👾 —</span>
   </div>
   <div id="avisoJogo" class="aviso-jogo oculto"></div>
 </div>
@@ -665,13 +667,16 @@ const Carro = {
       tanque: v.tanque * (1 + S.up.tanque*0.16),
       roda:  v.roda, larg:v.larg, alt:v.alt, cor:v.cor, teto:v.teto, tipo:v.tipo,
     };
-    const meioL = this.spec.larg/2;
+    const baseX = this.spec.larg*0.46;          // entre-eixos largo (rodas bem afastadas)
+    const baseY = this.spec.alt*0.92;           // rodas bem abaixo do chassi
     this.rodas = [
-      {dx:-meioL+6, dy:this.spec.alt*0.55, comp:0, rot:0}, // traseira (tração)
-      {dx: meioL-6, dy:this.spec.alt*0.55, comp:0, rot:0}, // dianteira
+      {dx:-baseX, dy:baseY, comp:0, rot:0},     // traseira (tração)
+      {dx: baseX, dy:baseY, comp:0, rot:0},     // dianteira
     ];
+    this._restY = baseY + this.spec.roda;       // altura de repouso (roda no chão)
     this.x = 120;
-    this.y = Terreno.altura(this.x) - 60;
+    // nasce com as rodas apoiadas no solo
+    this.y = Terreno.altura(this.x) - this._restY - 2;
     this.vx=0; this.vy=0; this.ang=0; this.vAng=0;
     this.combustivel = 1;
     this.vivo=true; this.motivo='';
@@ -696,56 +701,53 @@ const Carro = {
     // gravidade
     this.vy += G*dt;
 
-    // ---- rodas: suspensão + tração ----
+    // ---- rodas: suspensão (baseada em posição) + tração ----
+    // Resolvemos a penetração no solo movendo o corpo para fora dele.
+    // Isso garante que o carro SEMPRE encosta no chão e nunca atravessa,
+    // então a roda traseira sempre consegue tração.
     let qtdNoChao=0;
     const cos=Math.cos(this.ang), sin=Math.sin(this.ang);
+    const curso = 26;                             // curso visual da suspensão
     for(let i=0;i<this.rodas.length;i++){
       const r=this.rodas[i];
       // posição mundial do ponto de fixação da roda
       const ax = this.x + r.dx*cos - r.dy*sin;
       const ay = this.y + r.dx*sin + r.dy*cos;
       const solo = Terreno.altura(ax);
-      const raioSusp = 22;                       // curso da suspensão
-      const penetra = (ay + sp.roda) - solo;     // quanto a roda passou do chão
-      if(penetra > -raioSusp && penetra < sp.roda+raioSusp){
-        // mola: empurra para cima conforme a compressão
-        const comp = clamp((penetra+raioSusp)/(raioSusp), 0, 1.4);
-        r.comp = clamp(comp, 0, 1);
-        if(penetra > 0){
-          qtdNoChao++;
-          const inc = Terreno.inclinacao(ax);
-          const nx = Math.sin(inc), ny = -Math.cos(inc);    // normal do terreno
-          // mola da suspensão (empurra o carro para cima do solo)
-          const k = 30 * sp.susp;
-          const damp = 2.0 * sp.susp;
-          const velNormal = this.vx*nx + this.vy*ny;
-          const forca = (penetra*k - velNormal*damp);
-          this.vx += nx*forca*dt;
-          this.vy += ny*forca*dt;
-          // torque que alinha o chassi à inclinação da rampa
-          let dAng = inc - this.ang;
-          while(dAng> Math.PI) dAng-=Math.PI*2;
-          while(dAng<-Math.PI) dAng+=Math.PI*2;
-          this.vAng += dAng * 5.0 * dt;
-          // ---- tração: só a roda traseira (i===0) puxa ----
-          if(temGas && i===0){
-            const dir = (gas - freio);                 // +1 acelera, -1 freia/ré
-            const acel = dir * sp.power / sp.peso * dt; // aceleração ao longo da rampa
-            this.vx += Math.cos(inc) * acel;
-            this.vy += Math.sin(inc) * acel;
-            this.vAng -= dir * 1.1 * dt;                // tende a empinar ao acelerar
-          }
+      const penetra = (ay + sp.roda) - solo;      // > 0 = roda dentro do chão
+      if(penetra > 0){
+        qtdNoChao++;
+        r.comp = clamp(penetra/curso, 0, 1);      // compressão p/ animação
+        const inc = Terreno.inclinacao(ax);
+        // correção de posição: empurra o corpo para cima (cada roda resolve parte)
+        this.y -= penetra * 0.6 / sp.peso;
+        // amortecimento vertical (sensação de mola)
+        if(this.vy > 0) this.vy *= (1 - 0.55*sp.susp);
+        // alinha o chassi à inclinação da rampa
+        let dAng = inc - this.ang;
+        while(dAng> Math.PI) dAng-=Math.PI*2;
+        while(dAng<-Math.PI) dAng+=Math.PI*2;
+        this.vAng += dAng * 6.0 * dt;
+        // ---- tração: só a roda traseira (i===0) puxa ----
+        if(temGas && i===0){
+          const dir = (gas - freio);                  // +1 acelera, -1 freia/ré
+          const acel = dir * sp.power / sp.peso * dt;  // aceleração ao longo da rampa
+          this.vx += Math.cos(inc) * acel;
+          this.vy += Math.sin(inc) * acel;
+          this.vAng -= dir * 0.4 * dt;                 // leve tendência a empinar
         }
-      } else { r.comp = lerp(r.comp,0,clamp(dt*8,0,1)); }
+      } else {
+        r.comp = lerp(r.comp, 0, clamp(dt*8,0,1));
+      }
       // rotação visual da roda conforme velocidade horizontal
       r.rot += (this.vx/ sp.roda) * dt;
     }
     this.noChao = qtdNoChao>0;
 
     // resistência: forte no chão (pneu/atrito) e leve no ar — define a velocidade máxima
-    const dragX = this.noChao ? 1.25 : 0.22;
+    const dragX = this.noChao ? 1.15 : 0.20;
     this.vx *= (1 - dragX*dt);
-    this.vy *= (1 - 0.30*dt);
+    this.vy *= (1 - 0.20*dt);
     // limites de velocidade angular
     this.vAng = clamp(this.vAng, -7, 7);
     this.vAng *= (1 - 1.4*dt);
@@ -755,9 +757,9 @@ const Carro = {
     this.y += this.vy*dt;
     this.ang += this.vAng*dt;
 
-    // não deixar afundar demais no chão (segurança)
+    // failsafe: se por algum glitch passar muito do chão, recoloca na superfície
     const soloC = Terreno.altura(this.x);
-    if(this.y > soloC + 80){ this.y = soloC + 80; if(this.vy>0) this.vy*=0.3; }
+    if(this.y > soloC + 160){ this.y = soloC; this.vy=0; }
 
     // ---- condições de fim ----
     // capotou: ângulo muito virado por tempo demais
@@ -849,6 +851,53 @@ const Cam = {x:0,y:0, escala:1,
     const alvoY = Carro.y - H*0.52;
     this.x = lerp(this.x, alvoX, clamp(dt*4,0,1));
     this.y = lerp(this.y, alvoY, clamp(dt*3,0,1));
+  }
+};
+
+/* ----------------------------------------------------------------
+   10b. PERSEGUIDOR ALIENÍGENA (a forma de PERDER)
+   Um disco voador segue o carro. Acelera com a distância. Se ele
+   alcançar o carro (você parou, capotou ou foi devagar), é game over.
+   ---------------------------------------------------------------- */
+const Perseguidor = {
+  x:0, ativo:false, fase:0,
+  iniciar(){ this.ativo=true; this.x = Carro.x - 780; this.fase=0; },
+  // velocidade sobe com a distância — obriga a melhorar o carro p/ ir mais longe
+  velocidade(){ return 135 + Math.min(250, Jogo.maxDistM*0.22); },
+  distancia(){ return Carro.x - this.x; },        // folga em px (mundo)
+  atualizar(dt){
+    if(!this.ativo) return;
+    this.x += this.velocidade()*dt;
+    this.fase += dt*4;
+    // não deixa ficar absurdamente longe atrás (mantém a tensão)
+    if(this.x < Carro.x - 1500) this.x = Carro.x - 1500;
+    // alcançou o carro?
+    if(this.x >= Carro.x - 26) Carro.morrer('Os aliens te pegaram! 👾');
+  },
+  desenhar(){
+    if(!this.ativo) return;
+    const wy = Terreno.altura(this.x) - 48 - Math.sin(this.fase)*6;   // pairando
+    const [sx,sy]=pontoTela(this.x,wy);
+    if(sx < -140 || sx > W+140) return;
+    ctx.save(); ctx.translate(sx,sy);
+    // feixe de luz
+    ctx.fillStyle='rgba(120,255,150,.16)';
+    ctx.beginPath(); ctx.moveTo(-11,6); ctx.lineTo(11,6); ctx.lineTo(28,50); ctx.lineTo(-28,50); ctx.closePath(); ctx.fill();
+    // disco
+    ctx.fillStyle='#6c7686'; ctx.beginPath(); ctx.ellipse(0,5,31,11,0,0,7); ctx.fill();
+    ctx.fillStyle='#aab4c0'; ctx.beginPath(); ctx.ellipse(0,2,31,9,0,0,7); ctx.fill();
+    // cúpula de vidro
+    ctx.fillStyle='rgba(160,225,255,.9)'; ctx.beginPath(); ctx.arc(0,-1,14,Math.PI,0); ctx.fill();
+    // alienzinho
+    ctx.fillStyle='#5fd06a'; ctx.beginPath(); ctx.arc(0,-3,7,0,7); ctx.fill();
+    ctx.fillStyle='#0d2a14'; ctx.beginPath();
+    ctx.ellipse(-2.4,-4,2,3,0.3,0,7); ctx.ellipse(2.4,-4,2,3,-0.3,0,7); ctx.fill();
+    // luzes piscando
+    for(let i=-2;i<=2;i++){
+      ctx.fillStyle=(Math.floor(this.fase*3)+i)%2 ? '#ffd23e' : '#ff5d52';
+      ctx.beginPath(); ctx.arc(i*11,8,2.6,0,7); ctx.fill();
+    }
+    ctx.restore();
   }
 };
 
@@ -1099,18 +1148,19 @@ let ultimo=0, fpsAcc=0;
 function iniciarPartida(){
   const mapa = MAPAS.find(m=>m.id===S.mapaSel) || MAPAS[0];
   Terreno.iniciar(mapa);
-  Carro.iniciar();
   Cam.x=0; Cam.y=0;
   coletaveis=[]; enfeites=[]; Particulas.length=0;
   proxItem=0; proxEnfeite=0;
   gerarMundo(2500);
-  moedasSessao=0; Jogo.dist=0; Jogo.distM=0; Jogo.maxDistM=0; Jogo.tempo=0;
+  moedasSessao=0; Jogo.dist=0; Jogo.distM=0; Jogo.maxDistM=0; Jogo.tempo=0; Jogo._ultAviso=0;
+  Carro.iniciar();
+  Perseguidor.iniciar();
   Jogo.estado='jogando';
   mostrarTela(null);
   $('#hud').classList.remove('oculto');
   $('#touch').classList.toggle('oculto', !ehTouch);
   Som.retomar(); Som.motorLigar();
-  avisoJogo('Acelere para subir! 🏁');
+  avisoJogo('Fuja dos aliens! Acelere! 👾🏁');
 }
 
 function fimDePartida(){
@@ -1158,11 +1208,18 @@ function atualizar(dt){
   const freio = Jogo.ctrl.freio?1:0;
 
   Carro.atualizar(dt, gas, freio);
+  Perseguidor.atualizar(dt);
   Cam.seguir(dt);
 
   // distância (em metros fictícios)
   Jogo.distM = Math.max(0, (Carro.x-120)/12);
   Jogo.maxDistM = Math.max(Jogo.maxDistM, Jogo.distM);
+
+  // aviso quando os aliens estão colando
+  const gap = Perseguidor.distancia();
+  if(Carro.vivo && gap < 320 && Jogo.tempo - (Jogo._ultAviso||0) > 3){
+    Jogo._ultAviso = Jogo.tempo; avisoJogo('⚠️ Eles estão chegando! Corre!');
+  }
 
   // gera mundo à frente
   gerarMundo(Carro.x + W + 1500);
@@ -1202,6 +1259,7 @@ function renderizar(dt){
     desenharChao(mapa);
     desenharEnfeites(mapa);
     desenharColetaveis(Jogo.tempo);
+    Perseguidor.desenhar();
     desenharParticulas();
     desenharCarro();
   }
@@ -1225,6 +1283,11 @@ function atualizarHUD(){
   $('#hudMoedas').textContent = fmt(moedasSessao);
   $('#hudNivel').textContent = '⭐ Nível '+S.nivel;
   $('#hudRec').textContent = '🏆 '+fmt(S.recorde)+' m';
+  // distância até os aliens
+  const gapM = Math.max(0, Perseguidor.distancia()/12);
+  const alienEl = $('#hudAlien');
+  alienEl.textContent = '👾 '+fmt(gapM)+' m';
+  alienEl.classList.toggle('perigo', gapM < 28);
   const fb=$('#fuelBar'); const f=Carro.combustivel;
   fb.style.width=(f*100)+'%';
   fb.classList.toggle('baixo', f<0.35 && f>=0.15);
