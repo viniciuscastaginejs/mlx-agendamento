@@ -73,6 +73,8 @@ button{font-family:inherit;cursor:pointer;border:0;color:inherit;background:none
   padding:6px 12px;border-radius:999px;backdrop-filter:blur(4px);white-space:nowrap;
 }
 .chip b{color:#ffd66b}
+.chip.speedo{font-family:"Courier New",ui-monospace,monospace;font-weight:900;color:#7ee0ff;letter-spacing:1px;text-shadow:0 0 6px rgba(120,224,255,.45);min-width:62px;justify-content:center}
+.chip.speedo small{font-size:.6rem;color:var(--texto2);margin-left:3px;letter-spacing:0;font-weight:700}
 .chip.perigo{background:rgba(216,55,46,.85);border-color:#ff8a80;animation:piscar .5s steps(2) infinite}
 
 /* ---------- Telas (overlays) ---------- */
@@ -121,9 +123,10 @@ button{font-family:inherit;cursor:pointer;border:0;color:inherit;background:none
 .fechar:active{transform:scale(.9)}
 
 /* ---------- Abas da loja ---------- */
-.abas{display:flex;gap:6px;padding:10px 14px 0}
+.abas{display:flex;gap:6px;padding:10px 14px 0;overflow-x:auto;-webkit-overflow-scrolling:touch}
+.abas::-webkit-scrollbar{display:none}
 .aba{
-  flex:1;padding:10px 3px;border-radius:12px 12px 0 0;font-weight:800;font-size:.76rem;color:var(--texto2);
+  flex:1 0 auto;padding:10px 10px;border-radius:12px 12px 0 0;font-weight:800;font-size:.78rem;color:var(--texto2);
   background:rgba(255,255,255,.04);border:1px solid transparent;border-bottom:0;white-space:nowrap;
 }
 .aba.ativa{color:#fff;background:rgba(255,255,255,.1);border-color:var(--borda)}
@@ -240,16 +243,25 @@ button{font-family:inherit;cursor:pointer;border:0;color:inherit;background:none
 .pedal.freio{left:max(14px,env(safe-area-inset-left));background:linear-gradient(180deg,rgba(255,93,82,.85),rgba(165,33,26,.85));box-shadow:0 6px 0 rgba(90,12,8,.8),0 12px 22px rgba(0,0,0,.45)}
 .pedal.gas{right:max(14px,env(safe-area-inset-right));background:linear-gradient(180deg,rgba(86,214,118,.85),rgba(20,128,58,.85));box-shadow:0 6px 0 rgba(8,72,30,.8),0 12px 22px rgba(0,0,0,.45)}
 .pedal.apertado{transform:translateY(5px) scale(.97);filter:brightness(1.18);box-shadow:0 1px 0 rgba(0,0,0,.6)}
-.pedal-nitro{
-  position:absolute;bottom:max(18px,env(safe-area-inset-bottom));right:calc(max(14px,env(safe-area-inset-right)) + clamp(110px,24vw,170px) + 12px);
-  width:clamp(66px,14vw,90px);height:clamp(82px,16vw,116px);border-radius:20px;
-  font-weight:900;font-size:clamp(.7rem,2vw,.9rem);line-height:1.05;color:#fff;pointer-events:auto;text-align:center;
-  border:2px solid rgba(255,255,255,.3);
-  background:linear-gradient(180deg,rgba(255,170,60,.9),rgba(214,90,12,.9));
-  box-shadow:0 6px 0 rgba(120,45,5,.8),0 12px 22px rgba(0,0,0,.45);
+.pedal-nitro{display:none}
+.cluster-acoes{
+  position:absolute;left:0;right:0;
+  bottom:calc(max(18px,env(safe-area-inset-bottom)) + clamp(92px,17vw,126px));
+  display:flex;justify-content:space-between;align-items:center;
+  padding:0 max(22px,env(safe-area-inset-right)) 0 max(22px,env(safe-area-inset-left));
+  pointer-events:none;
 }
-.pedal-nitro.apertado{transform:translateY(5px) scale(.97);filter:brightness(1.2);box-shadow:0 1px 0 rgba(0,0,0,.6)}
-.pedal-nitro:disabled{filter:grayscale(.7) brightness(.7)}
+.cluster-acoes button{pointer-events:auto}
+.btn-acao{
+  width:clamp(50px,12vw,60px);height:clamp(50px,12vw,60px);border-radius:50%;
+  font-size:1.5rem;font-weight:900;color:#fff;line-height:1;
+  background:rgba(18,26,42,.7);border:2px solid rgba(255,255,255,.28);backdrop-filter:blur(4px);
+  display:flex;align-items:center;justify-content:center;
+  box-shadow:0 4px 10px rgba(0,0,0,.4);
+}
+.btn-acao.apertado{transform:scale(.9);filter:brightness(1.25)}
+.btn-acao.nitro{background:linear-gradient(180deg,rgba(255,170,60,.95),rgba(214,90,12,.95));border-color:rgba(255,255,255,.4)}
+.btn-acao:disabled{filter:grayscale(.6) brightness(.65)}
 .nitro-trilho{display:inline-block;width:56px;height:9px;border-radius:5px;background:rgba(255,255,255,.18);overflow:hidden;vertical-align:middle}
 .nitro-trilho b{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ffd23e,#ff7a1a);border-radius:5px}
 
@@ -313,10 +325,12 @@ button{font-family:inherit;cursor:pointer;border:0;color:inherit;background:none
     </div>
   </div>
   <div class="hud-sub">
+    <span class="chip speedo" id="speedo">0<small>km/h</small></span>
     <span class="chip" id="hudNivel">⭐ Nível 1</span>
     <span class="chip" id="hudRec">🏆 0 m</span>
     <span class="chip" id="hudAlien">👾 —</span>
     <span class="chip oculto" id="hudNitroWrap">🔥 <span class="nitro-trilho"><b id="hudNitro"></b></span></span>
+    <span class="chip oculto" id="hudBoosts"></span>
   </div>
   <div id="avisoJogo" class="aviso-jogo oculto"></div>
 </div>
@@ -324,7 +338,11 @@ button{font-family:inherit;cursor:pointer;border:0;color:inherit;background:none
 <!-- ===================== Pedais (touch / clique) ===================== -->
 <div id="touch" class="oculto">
   <button class="pedal freio" id="btnFreio">◀ FREIO</button>
-  <button class="pedal-nitro oculto" id="btnNitro">🔥<br>NITRO</button>
+  <div class="cluster-acoes">
+    <button class="btn-acao" id="btnLeanT" aria-label="Inclinar para trás">⟲</button>
+    <button class="btn-acao nitro oculto" id="btnNitro" aria-label="Nitro">🔥</button>
+    <button class="btn-acao" id="btnLeanF" aria-label="Inclinar para frente">⟳</button>
+  </div>
   <button class="pedal gas" id="btnGas">GÁS ▶</button>
 </div>
 
@@ -359,7 +377,8 @@ button{font-family:inherit;cursor:pointer;border:0;color:inherit;background:none
       <button class="fechar" data-fechar="telaLoja">✕</button>
     </div>
     <div class="abas">
-      <button class="aba ativa" data-aba="melhorias">🔧 Melhorias</button>
+      <button class="aba ativa" data-aba="melhorias">🔧 Upgrades</button>
+      <button class="aba" data-aba="boosts">⏱️ Boosts</button>
       <button class="aba" data-aba="tracao">⚙️ Tração</button>
       <button class="aba" data-aba="veiculos">🚗 Carros</button>
       <button class="aba" data-aba="mapas">🗺️ Mapas</button>
@@ -394,9 +413,13 @@ button{font-family:inherit;cursor:pointer;border:0;color:inherit;background:none
         <input type="checkbox" id="cfgVib"><span class="interruptor"></span></label>
       <label class="tog"><div>✨ Efeitos visuais<small>Poeira, fumaça e partículas</small></div>
         <input type="checkbox" id="cfgFx"><span class="interruptor"></span></label>
+      <div class="tog" style="flex-direction:column;align-items:stretch;gap:10px">
+        <div>🔈 Som do escapamento<small>Toque para ouvir e escolher</small></div>
+        <div id="escapeOpcoes" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+      </div>
       <button class="btn verm" id="btnReset" style="width:100%;margin-top:6px">🗑️ Apagar progresso</button>
       <p style="text-align:center;color:var(--texto2);font-size:.75rem;margin-top:14px">
-        Teclado: <b>→ / D</b> acelera • <b>← / A</b> freia / ré • <b>P</b> pausa
+        Teclado: <b>→/D</b> acelera • <b>←/A</b> ré • <b>↑/W</b> e <b>↓/S</b> inclinam • <b>Espaço</b> nitro • <b>P</b> pausa
       </p>
     </div>
   </div>
@@ -532,8 +555,10 @@ const estadoPadrao = () => ({
   up:{motor:0,pneus:0,suspensao:0,tanque:0,nitro:0},
   tracao:'traseira', tracoes:['traseira'],   // tração atual e desbloqueadas
   coresCarro:{},                              // cor customizada por veículo (id -> hex)
+  boosts:{x2moedas:0, x2vel:0, ima:0},        // segundos de jogo restantes de cada boost
+  escudos:0,                                  // quantidade de escudos (1 uso cada)
   conquistas:[],
-  cfg:{som:true, vib:true, fx:true},
+  cfg:{som:true, vib:true, fx:true, escape:'suave'},
 });
 let S = carregar();
 
@@ -546,6 +571,8 @@ function carregar(){
       {up:Object.assign(p.up, dados.up||{}),
        cfg:Object.assign(p.cfg, dados.cfg||{}),
        coresCarro:Object.assign({}, dados.coresCarro||{}),
+       boosts:Object.assign(p.boosts, dados.boosts||{}),
+       escudos: dados.escudos||0,
        tracoes: dados.tracoes || ['traseira'],
        tracao: dados.tracao || 'traseira'});
   }catch(e){ return estadoPadrao(); }
@@ -567,14 +594,22 @@ function ganharXP(qtd){
 /* ----------------------------------------------------------------
    4. ÁUDIO (Web Audio API — sem arquivos externos)
    ---------------------------------------------------------------- */
+// Tipos de escapamento que o jogador pode escolher e ouvir
+const ESCAPES = {
+  suave:     {nome:'Suave',     tipo:'sine',     base:60, filtro:520,  vol:0.05},
+  classico:  {nome:'Clássico',  tipo:'triangle', base:52, filtro:680,  vol:0.06},
+  esportivo: {nome:'Esportivo', tipo:'square',   base:64, filtro:1100, vol:0.055},
+  grave:     {nome:'Grave',     tipo:'sawtooth', base:38, filtro:430,  vol:0.07},
+  mudo:      {nome:'Mudo',      tipo:null,       base:0,  filtro:0,    vol:0},
+};
 const Som = (()=>{
-  let ctx=null, motorOsc=null, motorGain=null, motorFiltro=null, ligado=false;
+  let ctx=null, motorOsc=null, motorOsc2=null, motorGain=null, motorFiltro=null, ligado=false;
   function init(){
     if(ctx) return;
     try{ ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ ctx=null; }
   }
   function ok(){ return ctx && S.cfg.som; }
-  // bip simples
+  function esc(){ return ESCAPES[S.cfg.escape] || ESCAPES.suave; }
   function bip(freq, dur, tipo='square', vol=0.12){
     if(!ok()) return;
     const o=ctx.createOscillator(), g=ctx.createGain();
@@ -588,6 +623,11 @@ const Som = (()=>{
     retomar(){ init(); if(ctx&&ctx.state==='suspended') ctx.resume(); },
     moeda(){ if(!ok())return; bip(880,0.07,'square',0.10); setTimeout(()=>bip(1320,0.09,'square',0.10),60); },
     ui(){ bip(520,0.06,'triangle',0.10); },
+    nitro(){ if(!ok())return; const o=ctx.createOscillator(),g=ctx.createGain();
+      o.type='sawtooth'; o.frequency.setValueAtTime(200,ctx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(900,ctx.currentTime+0.3);
+      g.gain.setValueAtTime(0.10,ctx.currentTime); g.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+0.35);
+      o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+0.35); },
     bater(){ if(!ok())return; const o=ctx.createOscillator(),g=ctx.createGain();
       o.type='sawtooth'; o.frequency.setValueAtTime(160,ctx.currentTime);
       o.frequency.exponentialRampToValueAtTime(40,ctx.currentTime+0.3);
@@ -597,21 +637,48 @@ const Som = (()=>{
     motorLigar(){
       init(); if(!ctx) return;
       if(motorOsc) return;
-      motorOsc=ctx.createOscillator(); motorGain=ctx.createGain(); motorFiltro=ctx.createBiquadFilter();
-      motorFiltro.type='lowpass'; motorFiltro.frequency.value=600;
-      motorOsc.type='sawtooth'; motorOsc.frequency.value=45;
+      const e=esc();
+      motorOsc=ctx.createOscillator(); motorOsc2=ctx.createOscillator();
+      motorGain=ctx.createGain(); motorFiltro=ctx.createBiquadFilter();
+      motorFiltro.type='lowpass'; motorFiltro.frequency.value=e.filtro||500;
+      motorOsc.type=e.tipo||'sine'; motorOsc.frequency.value=e.base||50;
+      motorOsc2.type='sine'; motorOsc2.frequency.value=(e.base||50)*1.5;  // 2ª voz p/ encorpar
       motorGain.gain.value=0;
-      motorOsc.connect(motorFiltro); motorFiltro.connect(motorGain); motorGain.connect(ctx.destination);
-      motorOsc.start(); ligado=true;
+      motorOsc.connect(motorFiltro); motorOsc2.connect(motorFiltro);
+      motorFiltro.connect(motorGain); motorGain.connect(ctx.destination);
+      motorOsc.start(); motorOsc2.start(); ligado=true;
     },
     motorAtualizar(rpm, gas){ // rpm 0..1
       if(!ligado||!ctx) return;
-      const vol = S.cfg.som ? (0.02 + gas*0.07) : 0;
+      const e=esc();
+      const vol = (S.cfg.som && e.tipo) ? (e.vol*0.4 + gas*e.vol) : 0;
       motorGain.gain.setTargetAtTime(vol, ctx.currentTime, 0.05);
-      motorOsc.frequency.setTargetAtTime(40 + rpm*150, ctx.currentTime, 0.06);
-      motorFiltro.frequency.setTargetAtTime(400 + rpm*1400, ctx.currentTime, 0.06);
+      motorOsc.frequency.setTargetAtTime((e.base||50) + rpm*150, ctx.currentTime, 0.06);
+      motorOsc2.frequency.setTargetAtTime(((e.base||50)+rpm*150)*1.5, ctx.currentTime, 0.06);
+      motorFiltro.frequency.setTargetAtTime((e.filtro*0.7||350) + rpm*1400, ctx.currentTime, 0.06);
     },
-    motorParar(){ if(motorOsc){ try{motorOsc.stop();}catch(e){} motorOsc=null; motorGain=null; ligado=false; } },
+    motorParar(){
+      if(motorOsc){ try{motorOsc.stop();motorOsc2.stop();}catch(e){} motorOsc=null; motorOsc2=null; motorGain=null; ligado=false; }
+    },
+    // toca uma "acelerada" curta para o jogador ouvir o escapamento escolhido
+    previewEscape(tipoEscape){
+      init(); if(!ctx) return; this.retomar();
+      const e=ESCAPES[tipoEscape]||ESCAPES.suave; if(!e.tipo) return;
+      const t0=ctx.currentTime;
+      const o=ctx.createOscillator(), o2=ctx.createOscillator(), g=ctx.createGain(), f=ctx.createBiquadFilter();
+      f.type='lowpass'; f.frequency.setValueAtTime(e.filtro,t0);
+      o.type=e.tipo; o2.type='sine';
+      o.frequency.setValueAtTime(e.base,t0);
+      o.frequency.linearRampToValueAtTime(e.base+170,t0+0.35);
+      o.frequency.linearRampToValueAtTime(e.base+40,t0+0.8);
+      o2.frequency.setValueAtTime(e.base*1.5,t0);
+      o2.frequency.linearRampToValueAtTime((e.base+170)*1.5,t0+0.35);
+      f.frequency.linearRampToValueAtTime(e.filtro+1200,t0+0.35);
+      g.gain.setValueAtTime(0,t0); g.gain.linearRampToValueAtTime(e.vol*1.6,t0+0.08);
+      g.gain.linearRampToValueAtTime(0.0001,t0+0.85);
+      o.connect(f);o2.connect(f);f.connect(g);g.connect(ctx.destination);
+      o.start(t0);o2.start(t0);o.stop(t0+0.9);o2.stop(t0+0.9);
+    },
   };
 })();
 
@@ -713,10 +780,11 @@ const Carro = {
   // consumo proporcional ao tanque (tanques maiores = mais "fôlego")
   consumo(gas){ return (0.00013 + gas*0.00014) / this.spec.tanque; },
 
-  atualizar(dt, gas, freio, nitroBtn){
+  atualizar(dt, gas, freio, nitroBtn, leanFrente, leanTras, velMult){
     if(!this.vivo) return;
     const G = 2400;                  // gravidade (px/s²)
     const sp = this.spec;
+    velMult = velMult || 1;          // multiplicador de boost de velocidade (loja)
 
     // combustível
     if(this.combustivel>0){
@@ -727,6 +795,7 @@ const Carro = {
 
     // ---- nitro ----
     if(nitroBtn && this.nitro>0.02 && temGas){
+      if(this.nitroAtivo<=0) Som.nitro();     // som só no início do impulso
       this.nitroAtivo = 0.12;                 // mantém aceso enquanto segura
       this.nitro = clamp(this.nitro - 0.55*dt, 0, 1);
     } else {
@@ -734,7 +803,10 @@ const Carro = {
       // recarrega devagar quando não usa (mais rápido com upgrade)
       this.nitro = clamp(this.nitro + (0.04 + S.up.nitro*0.012)*dt, 0, 1);
     }
-    const boost = this.nitroAtivo>0 ? sp.nitroForca : 1;   // multiplicador de força
+    const boost = (this.nitroAtivo>0 ? sp.nitroForca : 1) * velMult;   // multiplicador de força
+
+    // aderência do pneu: mais grip = mais tração efetiva (limitado p/ nunca travar)
+    const tracao = clamp(0.80 + sp.grip*0.30, 0.8, 1.5);
 
     // quais rodas tracionam, conforme a tração escolhida
     const tracaoTras = S.tracao !== 'dianteira';   // traseira ou 4x4
@@ -744,6 +816,10 @@ const Carro = {
 
     // gravidade
     this.vy += G*dt;
+
+    // ---- inclinação manual (botões/teclas) para "balançar" o carro ----
+    if(leanFrente) this.vAng += 5.0*dt;   // abaixa o nariz (sai do equilíbrio)
+    if(leanTras)   this.vAng -= 5.0*dt;   // empina / nariz pra cima
 
     // ---- rodas: suspensão (baseada em posição) + tração ----
     let qtdNoChao=0;
@@ -760,7 +836,8 @@ const Carro = {
         r.comp = clamp(penetra/curso, 0, 1);
         const inc = Terreno.inclinacao(ax);
         this.y -= penetra * 0.6 / sp.peso;
-        if(this.vy > 0) this.vy *= (1 - 0.55*sp.susp);
+        // amortecimento vertical — TRAVADO em faixa segura (nunca negativo)
+        if(this.vy > 0) this.vy *= clamp(1 - 0.42*sp.susp, 0.15, 0.95);
         let dAng = inc - this.ang;
         while(dAng> Math.PI) dAng-=Math.PI*2;
         while(dAng<-Math.PI) dAng+=Math.PI*2;
@@ -769,7 +846,7 @@ const Carro = {
         const estaRoda = (i===0 && tracaoTras) || (i===1 && tracaoDian);
         if(temGas && estaRoda){
           const dir = (gas - freio);
-          const acel = dir * sp.power / sp.peso * dt * fatorRoda * boost;
+          const acel = dir * sp.power / sp.peso * dt * fatorRoda * boost * tracao;
           this.vx += Math.cos(inc) * acel;
           this.vy += Math.sin(inc) * acel;
           // traseira tende a empinar; dianteira "puxa" e abaixa o nariz
@@ -800,12 +877,12 @@ const Carro = {
     if(this.y > soloC + 160){ this.y = soloC; this.vy=0; }
 
     // ---- condições de fim ----
-    // capotou: ângulo muito virado por tempo demais
+    // capotou: ângulo muito virado por tempo demais (margem p/ recuperar c/ inclinação)
     let a = this.ang % (Math.PI*2);
     if(a> Math.PI) a-=Math.PI*2; if(a<-Math.PI) a+=Math.PI*2;
-    if(Math.abs(a) > 2.2){
+    if(Math.abs(a) > 2.4){
       this._tCapot = (this._tCapot||0) + dt;
-      if(this._tCapot > 0.6){ this.morrer('Capotou!'); }
+      if(this._tCapot > 0.9){ this.morrer('Capotou!'); }
     } else this._tCapot=0;
 
     if(this.combustivel<=0 && Math.abs(this.vx)<6){
@@ -815,6 +892,15 @@ const Carro = {
 
   morrer(motivo){
     if(!this.vivo) return;
+    // escudo salva de capotagem ou aliens (não de combustível)
+    if(S.escudos>0 && (motivo==='Capotou!' || motivo.indexOf('aliens')>=0)){
+      S.escudos--; salvar();
+      this._tCapot=0; this.ang*=0.2; this.vAng=0; this.vy=-300; // dá um empurrão
+      if(typeof Perseguidor!=='undefined') Perseguidor.x = this.x - 700; // joga o alien pra trás
+      Som.nitro(); vibrar([20,40,20]);
+      avisoJogo('🛡️ Escudo usado! Restam '+S.escudos);
+      return;
+    }
     this.vivo=false; this.motivo=motivo;
     Som.bater(); vibrar([40,60,40]);
   },
@@ -860,16 +946,17 @@ let proxItem=0, proxEnfeite=0;
 function gerarMundo(ate){
   // moedas / combustível
   while(proxItem < ate){
-    proxItem += rand(120, 280);
+    proxItem += rand(90, 190);                 // aparecem com mais frequência
     const x = proxItem;
-    const y = Terreno.altura(x) - rand(35, 95);
-    if(Math.random()<0.12){
+    // na "linha" do carro (~42px acima do solo) para passar reto por elas
+    const y = Terreno.altura(x) - rand(34, 50);
+    if(Math.random()<0.10){
       coletaveis.push({x,y,tipo:'fuel',pego:false,fase:Math.random()*6});
     }else{
-      // às vezes em fileira (arco de moedas)
-      const grupo = Math.random()<0.4 ? (2+Math.floor(Math.random()*4)) : 1;
+      // a maioria vem em fileiras (mais fácil de juntar várias)
+      const grupo = Math.random()<0.6 ? (3+Math.floor(Math.random()*4)) : 1;
       for(let g=0; g<grupo; g++){
-        coletaveis.push({x:x+g*36, y:y-Math.sin(g/grupo*Math.PI)*22, tipo:'moeda',pego:false,fase:Math.random()*6});
+        coletaveis.push({x:x+g*34, y:y-Math.sin(g/Math.max(1,grupo-1)*Math.PI)*12, tipo:'moeda',pego:false,fase:Math.random()*6});
       }
     }
   }
@@ -885,10 +972,20 @@ function gerarMundo(ate){
    ---------------------------------------------------------------- */
 const Cam = {x:0,y:0, escala:1,
   seguir(dt){
-    const alvoX = Carro.x - W*0.32;
-    const alvoY = Carro.y - H*0.52;
-    this.x = lerp(this.x, alvoX, clamp(dt*4,0,1));
-    this.y = lerp(this.y, alvoY, clamp(dt*3,0,1));
+    // olha um pouco à frente na direção do movimento (deixa ver o que vem)
+    const frente = clamp(Carro.vx*0.35, -120, 220);
+    const alvoX = Carro.x - W*0.34 + frente;
+    const alvoY = Carro.y - H*0.50;
+    // segue rápido e parelho nos dois eixos
+    this.x = lerp(this.x, alvoX, clamp(dt*6,0,1));
+    this.y = lerp(this.y, alvoY, clamp(dt*5,0,1));
+    // trava de segurança: o carro NUNCA some da tela
+    const margem = 130;
+    const telaX = Carro.x - this.x, telaY = Carro.y - this.y;
+    if(telaX < margem)        this.x = Carro.x - margem;
+    if(telaX > W - margem)    this.x = Carro.x - (W - margem);
+    if(telaY < margem)        this.y = Carro.y - margem;
+    if(telaY > H - margem)    this.y = Carro.y - (H - margem);
   }
 };
 
@@ -1202,13 +1299,15 @@ function desenharColetaveis(t){
    ---------------------------------------------------------------- */
 let moedasSessao=0;
 function checarColetaveis(){
+  const raio = (S.boosts.ima>0) ? 78 : 56;       // área de coleta (ímã aumenta mais)
   for(const c of coletaveis){
     if(c.pego) continue;
     const dx=c.x-Carro.x, dy=c.y-Carro.y;
-    if(dx*dx+dy*dy < 44*44){
+    if(dx*dx+dy*dy < raio*raio){
       c.pego=true;
       if(c.tipo==='moeda'){
-        moedasSessao++; S.moedas++; S.totMoedas++;
+        const ganho = (S.boosts.x2moedas>0) ? 2 : 1;   // boost 2x moedas
+        moedasSessao+=ganho; S.moedas+=ganho; S.totMoedas+=ganho;
         Som.moeda(); vibrar(15);
       }else{
         Carro.combustivel = clamp(Carro.combustivel+0.35,0,1);
@@ -1224,7 +1323,7 @@ function checarColetaveis(){
 const Jogo = {
   estado:'menu',     // menu | jogando | pausa | fim
   tempo:0, dist:0, distM:0, maxDistM:0,
-  ctrl:{gas:false, freio:false, nitro:false},
+  ctrl:{gas:false, freio:false, nitro:false, leanF:false, leanT:false},
 };
 let ultimo=0, fpsAcc=0;
 
@@ -1238,6 +1337,7 @@ function iniciarPartida(){
   moedasSessao=0; Jogo.dist=0; Jogo.distM=0; Jogo.maxDistM=0; Jogo.tempo=0; Jogo._ultAviso=0;
   Carro.iniciar();
   Perseguidor.iniciar();
+  Jogo.ctrl.gas=Jogo.ctrl.freio=Jogo.ctrl.nitro=Jogo.ctrl.leanF=Jogo.ctrl.leanT=false;
   Jogo.estado='jogando';
   mostrarTela(null);
   $('#hud').classList.remove('oculto');
@@ -1294,13 +1394,26 @@ function atualizar(dt){
   const gas = Jogo.ctrl.gas?1:0;
   const freio = Jogo.ctrl.freio?1:0;
 
-  Carro.atualizar(dt, gas, freio, Jogo.ctrl.nitro);
+  // ---- boosts ativos (contam só durante o jogo) ----
+  for(const b in S.boosts){ if(S.boosts[b]>0){ S.boosts[b]=Math.max(0,S.boosts[b]-dt); if(S.boosts[b]===0) salvar(); } }
+  const velMult = S.boosts.x2vel>0 ? 1.6 : 1;     // boost de velocidade
+
+  Carro.atualizar(dt, gas, freio, Jogo.ctrl.nitro, Jogo.ctrl.leanF, Jogo.ctrl.leanT, velMult);
   Perseguidor.atualizar(dt);
   Cam.seguir(dt);
 
   // distância (em metros fictícios)
   Jogo.distM = Math.max(0, (Carro.x-120)/12);
   Jogo.maxDistM = Math.max(Jogo.maxDistM, Jogo.distM);
+
+  // ---- ímã: puxa moedas próximas ----
+  if(S.boosts.ima>0){
+    for(const c of coletaveis){
+      if(c.pego || c.tipo!=='moeda') continue;
+      const dx=Carro.x-c.x, dy=Carro.y-c.y, d2=dx*dx+dy*dy;
+      if(d2 < 220*220){ const d=Math.sqrt(d2)||1; c.x += dx/d*260*dt; c.y += dy/d*260*dt; }
+    }
+  }
 
   // aviso quando os aliens estão colando
   const gap = Perseguidor.distancia();
@@ -1368,6 +1481,9 @@ function desenharParticulas(){
 function atualizarHUD(){
   $('#hudDist').textContent = fmt(Jogo.maxDistM)+' m';
   $('#hudMoedas').textContent = fmt(moedasSessao);
+  // velocímetro digital (km/h arcade)
+  const kmh = Math.round(Math.abs(Carro.vx)*0.22);
+  $('#speedo').innerHTML = kmh+'<small>km/h</small>';
   $('#hudNivel').textContent = '⭐ Nível '+S.nivel;
   $('#hudRec').textContent = '🏆 '+fmt(S.recorde)+' m';
   // distância até os aliens
@@ -1384,6 +1500,15 @@ function atualizarHUD(){
     $('#hudNitro').style.width=(Carro.nitro*100)+'%';
     const bn=$('#btnNitro'); if(bn) bn.disabled = Carro.nitro<0.05;
   }
+  // boosts ativos + escudo
+  let txt='';
+  if(S.boosts.x2moedas>0) txt+='🪙×2 ';
+  if(S.boosts.x2vel>0)    txt+='⚡×2 ';
+  if(S.boosts.ima>0)      txt+='🧲 ';
+  if(S.escudos>0)         txt+='🛡️'+S.escudos;
+  const hb=$('#hudBoosts');
+  hb.textContent=txt.trim();
+  hb.classList.toggle('oculto', txt==='');
 }
 let avisoTimer=null;
 function avisoJogo(txt){
@@ -1450,6 +1575,7 @@ function renderLoja(){
   $$('.aba').forEach(a=>a.classList.toggle('ativa', a.dataset.aba===abaLoja));
   const corpo=$('#lojaCorpo'); corpo.innerHTML='';
   if(abaLoja==='melhorias') renderMelhorias(corpo);
+  if(abaLoja==='boosts')    renderBoosts(corpo);
   if(abaLoja==='tracao')    renderTracao(corpo);
   if(abaLoja==='veiculos')  renderVeiculos(corpo);
   if(abaLoja==='mapas')     renderMapas(corpo);
@@ -1476,6 +1602,49 @@ function renderMelhorias(corpo){
     S.moedas-=custo; S.up[chave]++; Som.ui(); salvar(); checarConquistas(); renderLoja(); atualizarMenu();
   });
 }
+// Boosts temporários (contam por tempo de JOGO) e escudo (1 uso)
+const BOOSTS_DEF = [
+  {id:'x2moedas', ico:'🪙', nome:'2× Moedas',     desc:'Dobra as moedas coletadas.', dur:300, custo:10000},
+  {id:'x2vel',    ico:'⚡', nome:'2× Velocidade',  desc:'Carro bem mais rápido.',      dur:300, custo:10000},
+  {id:'ima',      ico:'🧲', nome:'Ímã de Moedas',  desc:'Puxa as moedas de perto.',    dur:300, custo:8000},
+];
+function fmtMin(seg){ const m=Math.floor(seg/60), s=Math.round(seg%60); return m+':'+('0'+s).slice(-2); }
+function renderBoosts(corpo){
+  const aviso=document.createElement('p');
+  aviso.style.cssText='color:var(--texto2);font-size:.78rem;margin:0 2px 10px';
+  aviso.textContent='Os boosts duram por TEMPO DE JOGO (5 min na pista). O tempo conta só enquanto você joga e fica salvo.';
+  corpo.appendChild(aviso);
+  for(const b of BOOSTS_DEF){
+    const ativoSeg = S.boosts[b.id]||0;
+    const div=document.createElement('div'); div.className='linha-up';
+    const botao = ativoSeg>0
+      ? `<button class="btn verde mini" data-boost="${b.id}" ${S.moedas<b.custo?'disabled':''}>+5 min 🪙${fmt(b.custo)}</button>`
+      : `<button class="btn laranja mini" data-boost="${b.id}" ${S.moedas<b.custo?'disabled':''}>🪙 ${fmt(b.custo)}</button>`;
+    div.innerHTML=`<div class="up-ico">${b.ico}</div>
+      <div class="up-info"><b>${b.nome}</b><small>${b.desc}</small>
+        ${ativoSeg>0?`<small style="color:#7ee08e">⏱️ Ativo: ${fmtMin(ativoSeg)} restantes</small>`:''}</div>
+      ${botao}`;
+    corpo.appendChild(div);
+  }
+  const divE=document.createElement('div'); divE.className='linha-up';
+  divE.innerHTML=`<div class="up-ico">🛡️</div>
+    <div class="up-info"><b>Escudo</b><small>Salva de 1 capotagem ou 1 captura dos aliens.</small>
+      <small style="color:#7ee08e">Você tem: ${S.escudos}</small></div>
+    <button class="btn laranja mini" data-escudo="1" ${S.moedas<3000?'disabled':''}>🪙 ${fmt(3000)}</button>`;
+  corpo.appendChild(divE);
+  corpo.querySelectorAll('[data-boost]').forEach(bt=>bt.onclick=()=>{
+    const b=BOOSTS_DEF.find(o=>o.id===bt.dataset.boost);
+    if(S.moedas<b.custo) return;
+    S.moedas-=b.custo; S.boosts[b.id]=(S.boosts[b.id]||0)+b.dur;
+    Som.ui(); toast(b.ico,b.nome,'+5 min'); salvar(); atualizarMenu(); renderLoja();
+  });
+  divE.querySelector('[data-escudo]').onclick=()=>{
+    if(S.moedas<3000) return;
+    S.moedas-=3000; S.escudos++; Som.ui(); toast('🛡️','Escudo comprado','Você tem '+S.escudos);
+    salvar(); atualizarMenu(); renderLoja();
+  };
+}
+
 function renderTracao(corpo){
   const CUSTO_TRACAO = 10000;
   const defs=[
@@ -1646,7 +1815,22 @@ function abrirConq(){
    ---------------------------------------------------------------- */
 function abrirConfig(){
   $('#cfgSom').checked=S.cfg.som; $('#cfgVib').checked=S.cfg.vib; $('#cfgFx').checked=S.cfg.fx;
+  renderEscapes();
   mostrarTela('telaConfig');
+}
+function renderEscapes(){
+  const cont=$('#escapeOpcoes'); cont.innerHTML='';
+  for(const id in ESCAPES){
+    const e=ESCAPES[id];
+    const b=document.createElement('button');
+    b.className='btn mini '+(S.cfg.escape===id?'verde':'cinza');
+    b.textContent=(S.cfg.escape===id?'✓ ':'▶ ')+e.nome;
+    b.onclick=()=>{
+      S.cfg.escape=id; salvar(); renderEscapes();
+      Som.retomar(); Som.previewEscape(id);     // ouve na hora
+    };
+    cont.appendChild(b);
+  }
 }
 $('#cfgSom').onchange=e=>{ S.cfg.som=e.target.checked; if(!S.cfg.som)Som.motorParar(); salvar(); };
 $('#cfgVib').onchange=e=>{ S.cfg.vib=e.target.checked; salvar(); if(S.cfg.vib)vibrar(20); };
@@ -1673,13 +1857,16 @@ window.addEventListener('keydown',e=>{
 });
 window.addEventListener('keyup',e=>{ teclas[e.key.toLowerCase()]=false; aplicarTeclado(); });
 function aplicarTeclado(){
-  Jogo.ctrl.gas   = !!(teclas['arrowright']||teclas['d']||teclas['arrowup']||teclas['w']);
-  Jogo.ctrl.freio = !!(teclas['arrowleft'] ||teclas['a']||teclas['arrowdown']||teclas['s']);
+  Jogo.ctrl.gas   = !!(teclas['arrowright']||teclas['d']);
+  Jogo.ctrl.freio = !!(teclas['arrowleft'] ||teclas['a']);
+  Jogo.ctrl.leanT = !!(teclas['arrowup']   ||teclas['w']);   // empina / nariz pra cima
+  Jogo.ctrl.leanF = !!(teclas['arrowdown'] ||teclas['s']);   // abaixa o nariz
   Jogo.ctrl.nitro = !!(teclas[' ']||teclas['shift']);
 }
 
 // Pedais touch / clique
 function ligarPedal(el, prop){
+  if(!el) return;
   const dn=e=>{ e.preventDefault(); Jogo.ctrl[prop]=true; el.classList.add('apertado'); Som.retomar(); };
   const up=e=>{ e.preventDefault(); Jogo.ctrl[prop]=false; el.classList.remove('apertado'); };
   el.addEventListener('touchstart',dn,{passive:false});
@@ -1690,6 +1877,8 @@ function ligarPedal(el, prop){
 ligarPedal($('#btnGas'),'gas');
 ligarPedal($('#btnFreio'),'freio');
 ligarPedal($('#btnNitro'),'nitro');
+ligarPedal($('#btnLeanF'),'leanF');
+ligarPedal($('#btnLeanT'),'leanT');
 
 // (Os pedais GÁS/FREIO já cobrem o toque; sem atalho extra na tela para
 //  evitar estados "travados" de aceleração.)
