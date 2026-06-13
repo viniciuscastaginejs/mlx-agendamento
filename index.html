@@ -421,8 +421,1124 @@ button{font-family:inherit;cursor:pointer;border:0;color:inherit;background:none
 /* ============================================================
    VINÍCIUS GAMEPLAY – Joguinho Online
    Jogo 2D de subida de montanha em HTML5 Canvas + JS puro.
-   Sem bibliotecas. Sem frameworks. Feito para rodar a 60 FPS.
    ============================================================ */
+
+/* ----------------------------------------------------------------
+   1. UTILIDADES
+   ---------------------------------------------------------------- */
+const $  = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const clamp = (v,a,b) => v<a?a:(v>b?b:v);
+const lerp  = (a,b,t) => a+(b-a)*t;
+const rand  = (a,b) => a+Math.random()*(b-a);
+const fmt   = n => Math.round(n).toLocaleString('pt-BR');
+
+/* ----------------------------------------------------------------
+   2. CONFIGURAÇÃO DE CONTEÚDO (veículos, mapas, upgrades, conquistas)
+   ---------------------------------------------------------------- */
+// Cada upgrade tem 6 níveis (0 a 5). 'efeito' diz quanto cada nível soma.
+const UPGRADES = {
+  motor:     {nome:'Motor',     ico:'🔧', desc:'Mais força e aceleração',        base:120, mult:1.7},
+  pneus:     {nome:'Pneus',     ico:'🛞', desc:'Mais aderência, menos derrapada', base:100, mult:1.7},
+  suspensao: {nome:'Suspensão', ico:'🪛', desc:'Absorve melhor os impactos',      base:110, mult:1.7},
+  tanque:    {nome:'Tanque',    ico:'⛽', desc:'Mais combustível por corrida',     base:130, mult:1.7},
+};
+const MAX_NIVEL_UP = 5;
+// Custo de um upgrade no nível atual.
+function custoUpgrade(chave, nivelAtual){
+  const u = UPGRADES[chave];
+  return Math.round(u.base * Math.pow(u.mult, nivelAtual));
+}
+
+// Veículos. stats em escala 1..5 só para exibição; os números reais saem daqui.
+const VEICULOS = [
+  {id:'basico',  nome:'Carro Básico',    cor:'#e74c3c', teto:'#c0392b',
+   power:1.00, grip:1.00, peso:1.00, susp:1.00, tanque:1.00, roda:17, larg:78, alt:26, tipo:'hatch',
+   custo:0,    nivel:0,  desc:'O começo de toda lenda.'},
+  {id:'picape',  nome:'Picape',          cor:'#2980b9', teto:'#1f6391',
+   power:1.18, grip:1.15, peso:1.25, susp:1.10, tanque:1.20, roda:20, larg:92, alt:30, tipo:'pickup',
+   custo:2500, nivel:0,  desc:'Pesada, estável e gasta bem o tanque.'},
+  {id:'jipe',    nome:'Jipe 4x4',        cor:'#27ae60', teto:'#1e8449',
+   power:1.30, grip:1.35, peso:1.10, susp:1.45, tanque:1.10, roda:23, larg:84, alt:34, tipo:'jeep',
+   custo:7000, nivel:3,  desc:'Suspensão de montanha, encara qualquer subida.'},
+  {id:'esporte', nome:'Esportiva',       cor:'#f39c12', teto:'#d68910',
+   power:1.65, grip:1.25, peso:0.85, susp:0.95, tanque:0.95, roda:18, larg:96, alt:22, tipo:'sport',
+   custo:18000,nivel:6,  desc:'Velocíssima, mas instável. Para experts.'},
+  {id:'especial',nome:'Foguete VG',      cor:'#9b59b6', teto:'#7d3c98',
+   power:2.10, grip:1.55, peso:0.80, susp:1.35, tanque:1.40, roda:21, larg:100,alt:28, tipo:'special',
+   custo:50000,nivel:12, desc:'Veículo secreto. Força absurda e tanque enorme.'},
+];
+
+// Mapas / cenários. Cada um com paleta e rugosidade do terreno.
+const MAPAS = [
+  {id:'floresta', nome:'Floresta',  custo:0,     nivel:0,
+   ceu:['#7ec8ff','#bfe6ff','#e9f7ff'], chao:'#5a8a3c', chao2:'#3f6a28', terra:'#6b4a2a',
+   montanha:['#9fd0ff','#7fb4e8','#6a9fd6'], enfeite:'arvore', noite:false, rough:1.0},
+  {id:'montanha', nome:'Montanha',  custo:1200,  nivel:2,
+   ceu:['#5a93d6','#9cc4ef','#dfeefb'], chao:'#7d8b96', chao2:'#5c6772', terra:'#4a525c',
+   montanha:['#cfe3f5','#a9c6e6','#85a9cf'], enfeite:'pedra', noite:false, rough:1.45},
+  {id:'deserto',  nome:'Deserto',   custo:2500,  nivel:4,
+   ceu:['#ffd27a','#ffe6a8','#fff3d6'], chao:'#e0b96a','chao2':'#c79b4d', terra:'#a87b34',
+   montanha:['#f0cf94','#e2b876','#cf9f5c'], enfeite:'cacto', noite:false, rough:1.15},
+  {id:'neve',     nome:'Neve',      custo:4000,  nivel:6,
+   ceu:['#9fc4e8','#cfe2f3','#f2f8ff'], chao:'#eef5fb', chao2:'#cfdce8', terra:'#9fb0c0',
+   montanha:['#eaf3fb','#cfe0ee','#aac4dc'], enfeite:'pinheiro', noite:false, rough:1.3},
+  {id:'noturno',  nome:'Noturno',   custo:6500,  nivel:9,
+   ceu:['#0d1b3a','#1b2f5c','#33406e'], chao:'#26304a', chao2:'#1a2236', terra:'#141a2b',
+   montanha:['#2a3a63','#22305a','#1a2748'], enfeite:'arvore', noite:true, rough:1.55},
+];
+
+// Conquistas. 'cond(s)' recebe stats da sessão/jogo e devolve true quando concluída.
+const CONQUISTAS = [
+  {id:'primeira',  ico:'🚗', nome:'Primeira volta',  desc:'Percorra 100 m',           premio:200,  cond:s=>s.maxDist>=100},
+  {id:'km',        ico:'🛣️', nome:'Estradeiro',       desc:'Percorra 1.000 m',         premio:500,  cond:s=>s.maxDist>=1000},
+  {id:'maratona',  ico:'🏃', nome:'Maratonista',      desc:'Percorra 3.000 m',         premio:1500, cond:s=>s.maxDist>=3000},
+  {id:'moedas50',  ico:'🪙', nome:'Cofrinho',         desc:'Junte 50 moedas no total', premio:300,  cond:s=>s.totMoedas>=50},
+  {id:'moedas500', ico:'💰', nome:'Investidor',       desc:'Junte 500 moedas no total',premio:1200, cond:s=>s.totMoedas>=500},
+  {id:'garagem',   ico:'🚙', nome:'Garagem cheia',    desc:'Tenha 3 veículos',         premio:1000, cond:s=>s.veiculos.length>=3},
+  {id:'turista',   ico:'🗺️', nome:'Turista',          desc:'Desbloqueie 3 mapas',      premio:800,  cond:s=>s.mapas.length>=3},
+  {id:'nivel5',    ico:'⭐', nome:'Veterano',         desc:'Alcance o nível 5',        premio:700,  cond:s=>s.nivel>=5},
+  {id:'mecanico',  ico:'🔩', nome:'Mecânico',         desc:'Deixe um upgrade no máximo',premio:900,  cond:s=>Object.values(s.up).some(v=>v>=MAX_NIVEL_UP)},
+  {id:'lenda',     ico:'👑', nome:'Lenda viva',       desc:'Percorra 6.000 m',         premio:4000, cond:s=>s.maxDist>=6000},
+];
+
+/* ----------------------------------------------------------------
+   3. ESTADO PERSISTENTE (localStorage)
+   ---------------------------------------------------------------- */
+const SAVE_KEY = 'viniciusGameplay_v1';
+const estadoPadrao = () => ({
+  moedas:0, recorde:0, nivel:1, xp:0,
+  totMoedas:0, totDist:0,            // acumulados para conquistas
+  veiculoSel:'basico', mapaSel:'floresta',
+  veiculos:['basico'], mapas:['floresta'],
+  up:{motor:0,pneus:0,suspensao:0,tanque:0},
+  conquistas:[],
+  cfg:{som:true, vib:true, fx:true},
+});
+let S = carregar();
+
+function carregar(){
+  try{
+    const dados = JSON.parse(localStorage.getItem(SAVE_KEY));
+    if(!dados) return estadoPadrao();
+    return Object.assign(estadoPadrao(), dados,
+      {up:Object.assign(estadoPadrao().up, dados.up||{}),
+       cfg:Object.assign(estadoPadrao().cfg, dados.cfg||{})});
+  }catch(e){ return estadoPadrao(); }
+}
+function salvar(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){} }
+
+// XP necessário para passar do nível n para o n+1.
+const xpDoNivel = n => 500 + (n-1)*350;
+function ganharXP(qtd){
+  S.xp += qtd;
+  while(S.xp >= xpDoNivel(S.nivel)){
+    S.xp -= xpDoNivel(S.nivel);
+    S.nivel++;
+    toast('⭐','Subiu de nível!','Nível '+S.nivel);
+    Som.ui();
+  }
+}
+
+/* ----------------------------------------------------------------
+   4. ÁUDIO (Web Audio API — sem arquivos externos)
+   ---------------------------------------------------------------- */
+const Som = (()=>{
+  let ctx=null, motorOsc=null, motorGain=null, motorFiltro=null, ligado=false;
+  function init(){
+    if(ctx) return;
+    try{ ctx = new (window.AudioContext||window.webkitAudioContext)(); }catch(e){ ctx=null; }
+  }
+  function ok(){ return ctx && S.cfg.som; }
+  // bip simples
+  function bip(freq, dur, tipo='square', vol=0.12){
+    if(!ok()) return;
+    const o=ctx.createOscillator(), g=ctx.createGain();
+    o.type=tipo; o.frequency.value=freq;
+    g.gain.setValueAtTime(vol, ctx.currentTime);
+    g.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime+dur);
+    o.connect(g); g.connect(ctx.destination);
+    o.start(); o.stop(ctx.currentTime+dur);
+  }
+  return {
+    retomar(){ init(); if(ctx&&ctx.state==='suspended') ctx.resume(); },
+    moeda(){ if(!ok())return; bip(880,0.07,'square',0.10); setTimeout(()=>bip(1320,0.09,'square',0.10),60); },
+    ui(){ bip(520,0.06,'triangle',0.10); },
+    bater(){ if(!ok())return; const o=ctx.createOscillator(),g=ctx.createGain();
+      o.type='sawtooth'; o.frequency.setValueAtTime(160,ctx.currentTime);
+      o.frequency.exponentialRampToValueAtTime(40,ctx.currentTime+0.3);
+      g.gain.setValueAtTime(0.18,ctx.currentTime);
+      g.gain.exponentialRampToValueAtTime(0.0001,ctx.currentTime+0.35);
+      o.connect(g);g.connect(ctx.destination);o.start();o.stop(ctx.currentTime+0.35); },
+    motorLigar(){
+      init(); if(!ctx) return;
+      if(motorOsc) return;
+      motorOsc=ctx.createOscillator(); motorGain=ctx.createGain(); motorFiltro=ctx.createBiquadFilter();
+      motorFiltro.type='lowpass'; motorFiltro.frequency.value=600;
+      motorOsc.type='sawtooth'; motorOsc.frequency.value=45;
+      motorGain.gain.value=0;
+      motorOsc.connect(motorFiltro); motorFiltro.connect(motorGain); motorGain.connect(ctx.destination);
+      motorOsc.start(); ligado=true;
+    },
+    motorAtualizar(rpm, gas){ // rpm 0..1
+      if(!ligado||!ctx) return;
+      const vol = S.cfg.som ? (0.02 + gas*0.07) : 0;
+      motorGain.gain.setTargetAtTime(vol, ctx.currentTime, 0.05);
+      motorOsc.frequency.setTargetAtTime(40 + rpm*150, ctx.currentTime, 0.06);
+      motorFiltro.frequency.setTargetAtTime(400 + rpm*1400, ctx.currentTime, 0.06);
+    },
+    motorParar(){ if(motorOsc){ try{motorOsc.stop();}catch(e){} motorOsc=null; motorGain=null; ligado=false; } },
+  };
+})();
+
+function vibrar(ms){ if(S.cfg.vib && navigator.vibrate) try{navigator.vibrate(ms);}catch(e){} }
+
+/* ----------------------------------------------------------------
+   5. CANVAS E REDIMENSIONAMENTO
+   ---------------------------------------------------------------- */
+const cv = $('#jogo'), ctx = cv.getContext('2d');
+let W=0, H=0, DPR=1;
+function redimensionar(){
+  DPR = Math.min(window.devicePixelRatio||1, 2);   // limita DPR p/ desempenho
+  W = window.innerWidth; H = window.innerHeight;
+  cv.width = Math.floor(W*DPR); cv.height = Math.floor(H*DPR);
+  cv.style.width=W+'px'; cv.style.height=H+'px';
+  ctx.setTransform(DPR,0,0,DPR,0,0);
+}
+window.addEventListener('resize', redimensionar);
+redimensionar();
+
+/* ----------------------------------------------------------------
+   6. TERRENO PROCEDURAL
+   Altura do solo em qualquer x do mundo, com dificuldade crescente.
+   ---------------------------------------------------------------- */
+const Terreno = {
+  seed:1,
+  base:0,          // linha de referência (em coords de mundo)
+  mapa:null,
+  iniciar(mapa){
+    this.mapa = mapa;
+    this.seed = Math.random()*1000;
+    this.base = 0;
+  },
+  // altura (y do mundo) do solo em x. y cresce para baixo.
+  altura(x){
+    const r = this.mapa.rough;
+    const dif = Math.min(1.8, 1 + x/9000);          // fica mais acidentado com a distância
+    let h = 0;
+    h += Math.sin(x*0.0016 + this.seed)        * 70  * r;
+    h += Math.sin(x*0.0041 + this.seed*1.7)    * 38  * r * dif;
+    h += Math.sin(x*0.0102 + this.seed*2.3)    * 17  * r * dif;
+    h += Math.sin(x*0.022  + this.seed*3.1)    * 7   * r * dif;
+    // rampa inicial suave para o carro "nascer" no plano
+    if(x < 360){ h *= clamp((x-40)/320, 0, 1); }
+    return this.base + h;
+  },
+  // inclinação aproximada (derivada numérica)
+  inclinacao(x){
+    const d=6;
+    return Math.atan2(this.altura(x+d)-this.altura(x-d), 2*d);
+  }
+};
+
+/* ----------------------------------------------------------------
+   7. CARRO (física: corpo + 2 rodas com suspensão)
+   ---------------------------------------------------------------- */
+const Carro = {
+  x:0,y:0, vx:0,vy:0,      // posição/velocidade do centro
+  ang:0, vAng:0,           // ângulo do chassi e velocidade angular
+  rodas:[],                // {dx,dy, comp, rot}  (offsets locais, compressão, rotação visual)
+  combustivel:1,           // 0..1
+  vivo:true, motivo:'',
+  spec:null,               // stats finais do veículo+upgrades
+
+  iniciar(){
+    const v = VEICULOS.find(o=>o.id===S.veiculoSel) || VEICULOS[0];
+    // aplica upgrades (cada nível soma ~12% no atributo correspondente)
+    const k = lv => 1 + lv*0.12;
+    this.spec = {
+      ref:v,
+      power: v.power * k(S.up.motor) * 4200,
+      grip:  v.grip  * (0.82 + S.up.pneus*0.05),
+      peso:  v.peso,
+      susp:  v.susp  * (1 + S.up.suspensao*0.10),
+      tanque: v.tanque * (1 + S.up.tanque*0.16),
+      roda:  v.roda, larg:v.larg, alt:v.alt, cor:v.cor, teto:v.teto, tipo:v.tipo,
+    };
+    const meioL = this.spec.larg/2;
+    this.rodas = [
+      {dx:-meioL+6, dy:this.spec.alt*0.55, comp:0, rot:0}, // traseira (tração)
+      {dx: meioL-6, dy:this.spec.alt*0.55, comp:0, rot:0}, // dianteira
+    ];
+    this.x = 120;
+    this.y = Terreno.altura(this.x) - 60;
+    this.vx=0; this.vy=0; this.ang=0; this.vAng=0;
+    this.combustivel = 1;
+    this.vivo=true; this.motivo='';
+    this.noChao=false;
+  },
+
+  // consumo proporcional ao tanque (tanques maiores = mais "fôlego")
+  consumo(gas){ return (0.000085 + gas*0.00010) / this.spec.tanque; },
+
+  atualizar(dt, gas, freio){
+    if(!this.vivo) return;
+    const G = 2400;                  // gravidade (px/s²)
+    const sp = this.spec;
+
+    // combustível
+    if(this.combustivel>0){
+      this.combustivel -= this.consumo(gas)*60*dt;
+      if(this.combustivel<=0){ this.combustivel=0; }
+    }
+    const temGas = this.combustivel>0;
+
+    // gravidade
+    this.vy += G*dt;
+
+    // ---- rodas: suspensão + tração ----
+    let qtdNoChao=0;
+    const cos=Math.cos(this.ang), sin=Math.sin(this.ang);
+    for(let i=0;i<this.rodas.length;i++){
+      const r=this.rodas[i];
+      // posição mundial do ponto de fixação da roda
+      const ax = this.x + r.dx*cos - r.dy*sin;
+      const ay = this.y + r.dx*sin + r.dy*cos;
+      const solo = Terreno.altura(ax);
+      const raioSusp = 22;                       // curso da suspensão
+      const penetra = (ay + sp.roda) - solo;     // quanto a roda passou do chão
+      if(penetra > -raioSusp && penetra < sp.roda+raioSusp){
+        // mola: empurra para cima conforme a compressão
+        const comp = clamp((penetra+raioSusp)/(raioSusp), 0, 1.4);
+        r.comp = clamp(comp, 0, 1);
+        if(penetra > 0){
+          qtdNoChao++;
+          const inc = Terreno.inclinacao(ax);
+          const nx = Math.sin(inc), ny = -Math.cos(inc);    // normal do terreno
+          // força de mola + amortecimento
+          const k = 26 * sp.susp;
+          const damp = 1.6 * sp.susp;
+          const velNormal = this.vx*nx + this.vy*ny;
+          const forca = (penetra*k - velNormal*damp);
+          this.vx += nx*forca*dt;
+          this.vy += ny*forca*dt;
+          // torque que alinha o carro à rampa
+          this.vAng += (inc - this.ang) * 4.0 * dt;
+          // atrito lateral (evita deslizar eternamente)
+          this.vx *= (1 - 0.9*dt*sp.grip*0.4);
+          // ---- tração ----
+          if(temGas && i===0){     // só a roda traseira "puxa"
+            const dir = (gas - freio);     // +1 acelera, -1 ré/freio
+            const fx = Math.cos(inc)*dir*sp.power*dt;
+            const fy = Math.sin(inc)*dir*sp.power*dt;
+            this.vx += fx/ (sp.peso*60);
+            this.vy += fy/ (sp.peso*60);
+            // empinar: acelerar gera torque para trás
+            this.vAng -= dir*0.9*dt;
+          }
+        }
+      } else { r.comp = lerp(r.comp,0,clamp(dt*8,0,1)); }
+      // rotação visual da roda conforme velocidade horizontal
+      r.rot += (this.vx/ sp.roda) * dt;
+    }
+    this.noChao = qtdNoChao>0;
+
+    // arrasto do ar
+    this.vx *= (1 - 0.18*dt);
+    this.vy *= (1 - 0.05*dt);
+    // limites de velocidade angular
+    this.vAng = clamp(this.vAng, -7, 7);
+    this.vAng *= (1 - 1.2*dt);
+
+    // integra
+    this.x += this.vx*dt;
+    this.y += this.vy*dt;
+    this.ang += this.vAng*dt;
+
+    // não deixar afundar demais no chão (segurança)
+    const soloC = Terreno.altura(this.x);
+    if(this.y > soloC + 80){ this.y = soloC + 80; if(this.vy>0) this.vy*=0.3; }
+
+    // ---- condições de fim ----
+    // capotou: ângulo muito virado por tempo demais
+    let a = this.ang % (Math.PI*2);
+    if(a> Math.PI) a-=Math.PI*2; if(a<-Math.PI) a+=Math.PI*2;
+    if(Math.abs(a) > 2.2){
+      this._tCapot = (this._tCapot||0) + dt;
+      if(this._tCapot > 0.6){ this.morrer('Capotou!'); }
+    } else this._tCapot=0;
+
+    if(this.combustivel<=0 && Math.abs(this.vx)<6){
+      this.morrer('Acabou o combustível!');
+    }
+  },
+
+  morrer(motivo){
+    if(!this.vivo) return;
+    this.vivo=false; this.motivo=motivo;
+    Som.bater(); vibrar([40,60,40]);
+  },
+
+  // velocidade "para frente" em m/s aproximado
+  velKmh(){ return Math.abs(this.vx)*0.12; }
+};
+
+/* ----------------------------------------------------------------
+   8. PARTÍCULAS (poeira / fumaça)
+   ---------------------------------------------------------------- */
+const Particulas = [];
+function soltarPoeira(x,y,forte){
+  if(!S.cfg.fx) return;
+  const n = forte?3:1;
+  for(let i=0;i<n;i++){
+    Particulas.push({
+      x, y, vx:rand(-30,-90), vy:rand(-30,10),
+      vida:1, max:rand(0.4,0.8), r:rand(4,9), tipo:'poeira'
+    });
+  }
+}
+function soltarFumaca(x,y){
+  if(!S.cfg.fx) return;
+  Particulas.push({x,y,vx:rand(-10,10),vy:rand(-40,-70),vida:1,max:rand(0.6,1.1),r:rand(5,10),tipo:'fumaca'});
+}
+function atualizarParticulas(dt){
+  for(let i=Particulas.length-1;i>=0;i--){
+    const p=Particulas[i];
+    p.x+=p.vx*dt; p.y+=p.vy*dt; p.vy+=160*dt;
+    p.vida-=dt/p.max;
+    if(p.vida<=0) Particulas.splice(i,1);
+  }
+}
+
+/* ----------------------------------------------------------------
+   9. COLETÁVEIS (moedas e combustível) + ENFEITES
+   ---------------------------------------------------------------- */
+let coletaveis=[];   // {x,y,tipo:'moeda'|'fuel', pego, fase}
+let enfeites=[];     // {x, tipo, escala}
+let proxItem=0, proxEnfeite=0;
+
+function gerarMundo(ate){
+  // moedas / combustível
+  while(proxItem < ate){
+    proxItem += rand(120, 280);
+    const x = proxItem;
+    const y = Terreno.altura(x) - rand(35, 95);
+    if(Math.random()<0.12){
+      coletaveis.push({x,y,tipo:'fuel',pego:false,fase:Math.random()*6});
+    }else{
+      // às vezes em fileira (arco de moedas)
+      const grupo = Math.random()<0.4 ? (2+Math.floor(Math.random()*4)) : 1;
+      for(let g=0; g<grupo; g++){
+        coletaveis.push({x:x+g*36, y:y-Math.sin(g/grupo*Math.PI)*22, tipo:'moeda',pego:false,fase:Math.random()*6});
+      }
+    }
+  }
+  // enfeites de cenário
+  while(proxEnfeite < ate){
+    proxEnfeite += rand(90, 220);
+    enfeites.push({x:proxEnfeite, tipo:Terreno.mapa.enfeite, escala:rand(0.7,1.3), extra:Math.random()});
+  }
+}
+
+/* ----------------------------------------------------------------
+   10. CÂMERA
+   ---------------------------------------------------------------- */
+const Cam = {x:0,y:0, escala:1,
+  seguir(dt){
+    const alvoX = Carro.x - W*0.32;
+    const alvoY = Carro.y - H*0.52;
+    this.x = lerp(this.x, alvoX, clamp(dt*4,0,1));
+    this.y = lerp(this.y, alvoY, clamp(dt*3,0,1));
+  }
+};
+
+/* ----------------------------------------------------------------
+   11. DESENHO DO CENÁRIO (céu, montanhas com parallax, chão, enfeites)
+   ---------------------------------------------------------------- */
+function desenharCeu(m){
+  const g=ctx.createLinearGradient(0,0,0,H);
+  g.addColorStop(0,m.ceu[0]); g.addColorStop(0.55,m.ceu[1]); g.addColorStop(1,m.ceu[2]);
+  ctx.fillStyle=g; ctx.fillRect(0,0,W,H);
+  // sol / lua
+  const cx = W*0.78, cy=H*0.20;
+  ctx.save();
+  if(m.noite){
+    ctx.fillStyle='rgba(255,255,255,.92)'; ctx.beginPath(); ctx.arc(cx,cy,26,0,7); ctx.fill();
+    ctx.fillStyle=m.ceu[0]; ctx.beginPath(); ctx.arc(cx+11,cy-7,24,0,7); ctx.fill();
+    // estrelas (posição fixa pseudo-aleatória)
+    ctx.fillStyle='rgba(255,255,255,.8)';
+    for(let i=0;i<40;i++){
+      const sx=(i*2654435761%1000)/1000*W, sy=(i*40503%600)/600*H*0.5;
+      ctx.fillRect(sx,sy, (i%3)?1:2,(i%3)?1:2);
+    }
+  }else{
+    const gs=ctx.createRadialGradient(cx,cy,4,cx,cy,70);
+    gs.addColorStop(0,'rgba(255,255,225,.95)'); gs.addColorStop(1,'rgba(255,255,200,0)');
+    ctx.fillStyle=gs; ctx.beginPath(); ctx.arc(cx,cy,70,0,7); ctx.fill();
+    ctx.fillStyle='#fff7d6'; ctx.beginPath(); ctx.arc(cx,cy,30,0,7); ctx.fill();
+  }
+  ctx.restore();
+}
+
+// camadas de montanha com parallax
+function desenharMontanhas(m){
+  const camadas=[{p:0.15,a:170,c:m.montanha[0]},{p:0.30,a:240,c:m.montanha[1]},{p:0.48,a:330,c:m.montanha[2]}];
+  for(const cam of camadas){
+    const offX = Cam.x*cam.p;
+    ctx.fillStyle=cam.c;
+    ctx.beginPath();
+    ctx.moveTo(0,H);
+    const baseY = H*0.62;
+    for(let sx=0; sx<=W+40; sx+=24){
+      const wx=(sx+offX);
+      const h = Math.sin(wx*0.0018+cam.p*10)*cam.a*0.4
+              + Math.sin(wx*0.0006+cam.p*3)*cam.a*0.6;
+      ctx.lineTo(sx, baseY - h*0.5 - cam.a*0.1);
+    }
+    ctx.lineTo(W,H); ctx.closePath(); ctx.fill();
+  }
+}
+
+function pontoTela(wx,wy){ return [wx-Cam.x, wy-Cam.y]; }
+
+function desenharChao(m){
+  ctx.beginPath();
+  const passo=10;
+  const x0=Cam.x-20, x1=Cam.x+W+20;
+  let primeiro=true;
+  ctx.moveTo(-20,H+20);
+  for(let wx=x0; wx<=x1; wx+=passo){
+    const wy=Terreno.altura(wx);
+    const [sx,sy]=pontoTela(wx,wy);
+    if(primeiro){ ctx.lineTo(sx,sy); primeiro=false; } else ctx.lineTo(sx,sy);
+  }
+  ctx.lineTo(W+20,H+20); ctx.closePath();
+  // gradiente terra
+  const g=ctx.createLinearGradient(0,H*0.4,0,H);
+  g.addColorStop(0,m.chao); g.addColorStop(0.18,m.chao2); g.addColorStop(1,m.terra);
+  ctx.fillStyle=g; ctx.fill();
+  // faixa de grama/topo
+  ctx.lineWidth=8; ctx.strokeStyle=m.chao;
+  ctx.beginPath(); primeiro=true;
+  for(let wx=x0; wx<=x1; wx+=passo){
+    const [sx,sy]=pontoTela(wx,Terreno.altura(wx));
+    if(primeiro){ctx.moveTo(sx,sy);primeiro=false;} else ctx.lineTo(sx,sy);
+  }
+  ctx.stroke();
+}
+
+function desenharEnfeites(m){
+  for(const e of enfeites){
+    if(e.x < Cam.x-60 || e.x > Cam.x+W+60) continue;
+    const wy=Terreno.altura(e.x);
+    const [sx,sy]=pontoTela(e.x,wy);
+    ctx.save(); ctx.translate(sx,sy); ctx.scale(e.escala,e.escala);
+    desenharEnfeite(e.tipo, m, e.extra);
+    ctx.restore();
+  }
+}
+function desenharEnfeite(tipo,m,extra){
+  switch(tipo){
+    case 'arvore':
+      ctx.fillStyle='#6b4423'; ctx.fillRect(-4,-30,8,30);
+      ctx.fillStyle = m.noite?'#1c5e35':'#3aa14e';
+      ctx.beginPath(); ctx.arc(0,-42,20,0,7); ctx.arc(-12,-34,14,0,7); ctx.arc(12,-34,14,0,7); ctx.fill();
+      break;
+    case 'pinheiro':
+      ctx.fillStyle='#5b3a1e'; ctx.fillRect(-3,-16,6,16);
+      ctx.fillStyle='#2e7d4f';
+      for(let i=0;i<3;i++){ const yy=-16-i*14, ww=22-i*5;
+        ctx.beginPath(); ctx.moveTo(0,yy-22); ctx.lineTo(-ww,yy); ctx.lineTo(ww,yy); ctx.closePath(); ctx.fill(); }
+      break;
+    case 'pedra':
+      ctx.fillStyle='#7c8794'; ctx.beginPath();
+      ctx.ellipse(0,-9,16+extra*6,11,0,0,7); ctx.fill();
+      ctx.fillStyle='rgba(255,255,255,.12)'; ctx.beginPath(); ctx.ellipse(-4,-13,7,4,0,0,7); ctx.fill();
+      break;
+    case 'cacto':
+      ctx.fillStyle='#3f8f4a'; ctx.fillRect(-5,-40,10,40);
+      ctx.fillRect(-16,-30,8,5); ctx.fillRect(-16,-30,5,-14*-1); ctx.fillRect(-16,-44,5,16);
+      ctx.fillRect(8,-24,8,5); ctx.fillRect(11,-38,5,18);
+      break;
+  }
+}
+
+/* ----------------------------------------------------------------
+   12. DESENHO DO CARRO
+   ---------------------------------------------------------------- */
+function desenharCarro(){
+  const sp=Carro.spec;
+  const [sx,sy]=pontoTela(Carro.x,Carro.y);
+  ctx.save();
+  ctx.translate(sx,sy); ctx.rotate(Carro.ang);
+
+  // sombra
+  ctx.save(); ctx.rotate(-Carro.ang);
+  ctx.fillStyle='rgba(0,0,0,.18)';
+  ctx.beginPath(); ctx.ellipse(0,sp.alt*0.7+8,sp.larg*0.55,8,0,0,7); ctx.fill();
+  ctx.restore();
+
+  const L=sp.larg, A=sp.alt;
+
+  // rodas (com suspensão)
+  for(const r of Carro.rodas){
+    const wx=r.dx, wy=r.dy + r.comp*10;   // comprime ~10px
+    desenharRoda(wx,wy,sp.roda,r.rot);
+  }
+
+  // chassi (varia por tipo)
+  ctx.fillStyle=sp.cor;
+  desenharChassi(sp.tipo, L, A, sp);
+
+  ctx.restore();
+}
+function desenharRoda(x,y,raio,rot){
+  ctx.save(); ctx.translate(x,y);
+  // pneu
+  ctx.fillStyle='#1a1a1a'; ctx.beginPath(); ctx.arc(0,0,raio,0,7); ctx.fill();
+  // aro
+  ctx.fillStyle='#cfd6df'; ctx.beginPath(); ctx.arc(0,0,raio*0.55,0,7); ctx.fill();
+  // raios girando
+  ctx.rotate(rot); ctx.strokeStyle='#8a93a0'; ctx.lineWidth=2;
+  for(let i=0;i<4;i++){ ctx.rotate(Math.PI/2);
+    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(raio*0.5,0); ctx.stroke(); }
+  ctx.fillStyle='#5a6675'; ctx.beginPath(); ctx.arc(0,0,3,0,7); ctx.fill();
+  ctx.restore();
+}
+function arred(x,y,w,h,r){ // retângulo arredondado
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
+  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
+}
+function desenharChassi(tipo,L,A,sp){
+  const meio=L/2;
+  ctx.lineJoin='round';
+  // corpo base
+  arred(-meio,-A,L,A*2,8); ctx.fill();
+  // cabine/teto
+  ctx.fillStyle=sp.teto;
+  if(tipo==='pickup'){
+    arred(-meio+4,-A-14,L*0.42,18,6); ctx.fill();           // cabine na frente
+    ctx.fillStyle='rgba(0,0,0,.25)'; arred(meio*0.05,-A-12,L*0.40,9,4); ctx.fill(); // caçamba escura
+  }else if(tipo==='jeep'){
+    arred(-meio+8,-A-20,L*0.7,22,6); ctx.fill();
+  }else if(tipo==='sport'){
+    arred(-meio+12,-A-12,L*0.6,14,7); ctx.fill();
+  }else if(tipo==='special'){
+    arred(-meio+10,-A-18,L*0.65,20,8); ctx.fill();
+    ctx.fillStyle='#ff5ddb';                                 // turbina traseira
+    arred(-meio-6,-A*0.4,8,A*0.8,3); ctx.fill();
+  }else{ // hatch básico
+    arred(-meio+10,-A-16,L*0.62,18,7); ctx.fill();
+  }
+  // vidros
+  ctx.fillStyle='rgba(150,210,255,.85)';
+  arred(-meio+16,-A-12,L*0.22,11,3); ctx.fill();
+  arred(-meio+16+L*0.26,-A-12,L*0.2,11,3); ctx.fill();
+  // faróis
+  ctx.fillStyle='#ffe27a'; ctx.beginPath(); ctx.arc(meio-5,-2,4,0,7); ctx.fill();
+  ctx.fillStyle='#ff5d52'; ctx.beginPath(); ctx.arc(-meio+5,-2,3,0,7); ctx.fill();
+}
+
+/* ----------------------------------------------------------------
+   13. DESENHO DOS COLETÁVEIS
+   ---------------------------------------------------------------- */
+function desenharColetaveis(t){
+  for(const c of coletaveis){
+    if(c.pego) continue;
+    if(c.x < Cam.x-40 || c.x > Cam.x+W+40) continue;
+    const flut=Math.sin(t*3+c.fase)*4;
+    const [sx,sy]=pontoTela(c.x,c.y+flut);
+    if(c.tipo==='moeda'){
+      const e=0.65+0.35*Math.abs(Math.sin(t*3+c.fase)); // efeito girando
+      ctx.save(); ctx.translate(sx,sy); ctx.scale(e,1);
+      ctx.fillStyle='#ffcf2e'; ctx.beginPath(); ctx.arc(0,0,11,0,7); ctx.fill();
+      ctx.fillStyle='#ffe890'; ctx.beginPath(); ctx.arc(0,0,7,0,7); ctx.fill();
+      ctx.fillStyle='#d6a017'; ctx.font='bold 11px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('$',0,1); ctx.restore();
+    }else{ // combustível
+      ctx.save(); ctx.translate(sx,sy);
+      ctx.fillStyle='#e74c3c'; arred(-9,-11,18,20,4); ctx.fill();
+      ctx.fillStyle='#fff'; ctx.font='bold 12px sans-serif'; ctx.textAlign='center'; ctx.textBaseline='middle';
+      ctx.fillText('⛽',0,1); ctx.restore();
+    }
+  }
+}
+
+/* ----------------------------------------------------------------
+   14. COLISÃO COM COLETÁVEIS
+   ---------------------------------------------------------------- */
+let moedasSessao=0;
+function checarColetaveis(){
+  for(const c of coletaveis){
+    if(c.pego) continue;
+    const dx=c.x-Carro.x, dy=c.y-Carro.y;
+    if(dx*dx+dy*dy < 44*44){
+      c.pego=true;
+      if(c.tipo==='moeda'){
+        moedasSessao++; S.moedas++; S.totMoedas++;
+        Som.moeda(); vibrar(15);
+      }else{
+        Carro.combustivel = clamp(Carro.combustivel+0.35,0,1);
+        Som.ui(); toastRapido('+⛽');
+      }
+    }
+  }
+}
+
+/* ----------------------------------------------------------------
+   15. LOOP PRINCIPAL E ESTADOS DO JOGO
+   ---------------------------------------------------------------- */
+const Jogo = {
+  estado:'menu',     // menu | jogando | pausa | fim
+  tempo:0, dist:0, distM:0, maxDistM:0,
+  ctrl:{gas:false, freio:false},
+};
+let ultimo=0, fpsAcc=0;
+
+function iniciarPartida(){
+  const mapa = MAPAS.find(m=>m.id===S.mapaSel) || MAPAS[0];
+  Terreno.iniciar(mapa);
+  Carro.iniciar();
+  Cam.x=0; Cam.y=0;
+  coletaveis=[]; enfeites=[]; Particulas.length=0;
+  proxItem=0; proxEnfeite=0;
+  gerarMundo(2500);
+  moedasSessao=0; Jogo.dist=0; Jogo.distM=0; Jogo.maxDistM=0; Jogo.tempo=0;
+  Jogo.estado='jogando';
+  mostrarTela(null);
+  $('#hud').classList.remove('oculto');
+  $('#touch').classList.toggle('oculto', !ehTouch);
+  Som.retomar(); Som.motorLigar();
+  avisoJogo('Acelere para subir! 🏁');
+}
+
+function fimDePartida(){
+  Jogo.estado='fim';
+  Som.motorParar();
+  const distFinal=Math.round(Jogo.maxDistM);
+  const pontos = distFinal*10 + moedasSessao*25;
+  const xpGanho = Math.round(distFinal*0.4 + moedasSessao*3);
+
+  // recorde
+  const novoRec = distFinal > S.recorde;
+  if(novoRec) S.recorde=distFinal;
+  S.totDist += distFinal;
+  ganharXP(xpGanho);
+  checarConquistas();
+  salvar();
+
+  $('#fimTitulo').textContent = Carro.motivo;
+  $('#fimSub').textContent = pontos>=1000 ? 'Mandou bem demais!' : 'Bora de novo?';
+  $('#fimDist').textContent = fmt(distFinal)+' m';
+  $('#fimMoedas').textContent = '🪙 '+fmt(moedasSessao);
+  $('#fimPontos').textContent = fmt(pontos);
+  $('#fimXP').textContent = '+'+fmt(xpGanho)+' XP';
+  $('#fimRecorde').classList.toggle('oculto', !novoRec);
+  $('#hud').classList.add('oculto');
+  $('#touch').classList.add('oculto');
+  mostrarTela('telaFim');
+}
+
+function loop(ts){
+  requestAnimationFrame(loop);
+  let dt=(ts-ultimo)/1000; ultimo=ts;
+  if(dt>0.05) dt=0.05;            // evita "saltos" se a aba ficou em segundo plano
+  if(!dt) return;
+
+  if(Jogo.estado==='jogando'){
+    atualizar(dt);
+  }
+  renderizar(dt);
+}
+
+function atualizar(dt){
+  Jogo.tempo+=dt;
+  const gas = Jogo.ctrl.gas?1:0;
+  const freio = Jogo.ctrl.freio?1:0;
+
+  Carro.atualizar(dt, gas, freio);
+  Cam.seguir(dt);
+
+  // distância (em metros fictícios)
+  Jogo.distM = Math.max(0, (Carro.x-120)/12);
+  Jogo.maxDistM = Math.max(Jogo.maxDistM, Jogo.distM);
+
+  // gera mundo à frente
+  gerarMundo(Carro.x + W + 1500);
+
+  checarColetaveis();
+  atualizarParticulas(dt);
+
+  // poeira ao acelerar no chão
+  if(Carro.noChao && gas && Math.abs(Carro.vx)>40 && Math.random()<0.6){
+    const r=Carro.rodas[0];
+    const cos=Math.cos(Carro.ang), sin=Math.sin(Carro.ang);
+    soltarPoeira(Carro.x + r.dx*cos - r.dy*sin, Carro.y + r.dx*sin + r.dy*cos + Carro.spec.roda, Math.abs(Carro.vx)>200);
+  }
+  // fumacinha do escapamento
+  if(gas && Math.random()<0.2){
+    const cos=Math.cos(Carro.ang), sin=Math.sin(Carro.ang);
+    soltarFumaca(Carro.x - Carro.spec.larg*0.5*cos, Carro.y - Carro.spec.larg*0.5*sin -6);
+  }
+
+  // som do motor
+  Som.motorAtualizar(clamp(Math.abs(Carro.vx)/400,0,1), gas*(Carro.combustivel>0?1:0));
+
+  // HUD
+  atualizarHUD();
+
+  if(!Carro.vivo){ fimDePartida(); }
+}
+
+function renderizar(dt){
+  const mapa = (Jogo.estado==='menu') ? MAPAS.find(m=>m.id===S.mapaSel)||MAPAS[0] : Terreno.mapa||MAPAS[0];
+  if(Jogo.estado==='menu' && !Terreno.mapa){ Terreno.iniciar(mapa); }
+
+  desenharCeu(mapa);
+  desenharMontanhas(mapa);
+
+  if(Jogo.estado==='jogando' || Jogo.estado==='pausa' || Jogo.estado==='fim'){
+    desenharChao(mapa);
+    desenharEnfeites(mapa);
+    desenharColetaveis(Jogo.tempo);
+    desenharParticulas();
+    desenharCarro();
+  }
+}
+
+function desenharParticulas(){
+  for(const p of Particulas){
+    const [sx,sy]=pontoTela(p.x,p.y);
+    ctx.globalAlpha = p.vida*0.5;
+    ctx.fillStyle = p.tipo==='fumaca' ? '#888' : '#caa46a';
+    ctx.beginPath(); ctx.arc(sx,sy,p.r*(1.4-p.vida*0.4),0,7); ctx.fill();
+  }
+  ctx.globalAlpha=1;
+}
+
+/* ----------------------------------------------------------------
+   16. HUD
+   ---------------------------------------------------------------- */
+function atualizarHUD(){
+  $('#hudDist').textContent = fmt(Jogo.maxDistM)+' m';
+  $('#hudMoedas').textContent = fmt(moedasSessao);
+  $('#hudNivel').textContent = '⭐ Nível '+S.nivel;
+  $('#hudRec').textContent = '🏆 '+fmt(S.recorde)+' m';
+  const fb=$('#fuelBar'); const f=Carro.combustivel;
+  fb.style.width=(f*100)+'%';
+  fb.classList.toggle('baixo', f<0.35 && f>=0.15);
+  fb.classList.toggle('critico', f<0.15);
+}
+let avisoTimer=null;
+function avisoJogo(txt){
+  const el=$('#avisoJogo'); el.textContent=txt; el.classList.remove('oculto');
+  el.style.animation='none'; void el.offsetWidth; el.style.animation='';
+  clearTimeout(avisoTimer); avisoTimer=setTimeout(()=>el.classList.add('oculto'),4500);
+}
+function toastRapido(txt){ avisoJogo(txt); }
+
+/* ----------------------------------------------------------------
+   17. CONQUISTAS + TOASTS
+   ---------------------------------------------------------------- */
+function snapshotConq(){
+  return {maxDist:Math.max(S.recorde,Jogo.maxDistM), totMoedas:S.totMoedas,
+          veiculos:S.veiculos, mapas:S.mapas, nivel:S.nivel, up:S.up};
+}
+function checarConquistas(){
+  const snap=snapshotConq();
+  for(const c of CONQUISTAS){
+    if(S.conquistas.includes(c.id)) continue;
+    if(c.cond(snap)){
+      S.conquistas.push(c.id);
+      S.moedas += c.premio; S.totMoedas += c.premio;
+      toast(c.ico, c.nome, '+'+fmt(c.premio)+' 🪙');
+      Som.ui();
+    }
+  }
+}
+function toast(ico,titulo,sub){
+  const el=document.createElement('div'); el.className='toast';
+  el.innerHTML=`<span class="t-ico">${ico}</span><div>${titulo}<br><small>${sub}</small></div>`;
+  $('#toasts').appendChild(el);
+  setTimeout(()=>el.remove(),3400);
+}
+
+/* ----------------------------------------------------------------
+   18. NAVEGAÇÃO DE TELAS
+   ---------------------------------------------------------------- */
+const TELAS=['telaMenu','telaLoja','telaConq','telaConfig','telaPausa','telaFim'];
+function mostrarTela(id){
+  for(const t of TELAS) $('#'+t).classList.add('oculto');
+  if(id) $('#'+id).classList.remove('oculto');
+}
+function voltarMenu(){
+  Jogo.estado='menu'; Som.motorParar();
+  $('#hud').classList.add('oculto'); $('#touch').classList.add('oculto');
+  Terreno.mapa=null;
+  atualizarMenu();
+  mostrarTela('telaMenu');
+}
+function atualizarMenu(){
+  $('#menuMoedas').textContent=fmt(S.moedas);
+  $('#menuNivel').textContent='⭐ Nível '+S.nivel;
+  $('#menuRec').textContent='🏆 Recorde '+fmt(S.recorde)+' m';
+}
+
+/* ----------------------------------------------------------------
+   19. LOJA (melhorias, veículos, mapas)
+   ---------------------------------------------------------------- */
+let abaLoja='melhorias';
+function abrirLoja(){ atualizarMenu(); renderLoja(); mostrarTela('telaLoja'); }
+function renderLoja(){
+  $('#lojaMoedas').textContent=fmt(S.moedas);
+  $$('.aba').forEach(a=>a.classList.toggle('ativa', a.dataset.aba===abaLoja));
+  const corpo=$('#lojaCorpo'); corpo.innerHTML='';
+  if(abaLoja==='melhorias') renderMelhorias(corpo);
+  if(abaLoja==='veiculos')  renderVeiculos(corpo);
+  if(abaLoja==='mapas')     renderMapas(corpo);
+}
+function renderMelhorias(corpo){
+  for(const chave in UPGRADES){
+    const u=UPGRADES[chave]; const nv=S.up[chave]; const max=nv>=MAX_NIVEL_UP;
+    const custo=max?0:custoUpgrade(chave,nv);
+    const pips=Array.from({length:MAX_NIVEL_UP},(_,i)=>`<span class="pip ${i<nv?'cheio':''}"></span>`).join('');
+    const div=document.createElement('div'); div.className='linha-up';
+    div.innerHTML=`
+      <div class="up-ico">${u.ico}</div>
+      <div class="up-info"><b>${u.nome}</b><small>${u.desc}</small><div class="pips">${pips}</div></div>
+      <button class="btn ${max?'verde':'laranja'} mini" ${max||S.moedas<custo?'disabled':''} data-up="${chave}">
+        ${max?'MÁX':'🪙 '+fmt(custo)}
+      </button>`;
+    corpo.appendChild(div);
+  }
+  corpo.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>{
+    const chave=b.dataset.up, nv=S.up[chave];
+    if(nv>=MAX_NIVEL_UP) return;
+    const custo=custoUpgrade(chave,nv);
+    if(S.moedas<custo) return;
+    S.moedas-=custo; S.up[chave]++; Som.ui(); salvar(); checarConquistas(); renderLoja(); atualizarMenu();
+  });
+}
+function renderVeiculos(corpo){
+  const grade=document.createElement('div'); grade.className='grade';
+  for(const v of VEICULOS){
+    const tem=S.veiculos.includes(v.id);
+    const sel=S.veiculoSel===v.id;
+    const podeNivel=S.nivel>=v.nivel;
+    const div=document.createElement('div'); div.className='card'+(sel?' sel':'');
+    const barra=(lbl,val)=>`<div class="barra"><span>${lbl}</span><div class="barra-t"><div class="barra-v" style="width:${clamp(val/2.2*100,5,100)}%"></div></div></div>`;
+    let acao;
+    if(sel)            acao=`<button class="btn verde mini" disabled>✓ Em uso</button>`;
+    else if(tem)       acao=`<button class="btn azul mini" data-usar="${v.id}">Usar</button>`;
+    else if(!podeNivel)acao=`<button class="btn cinza mini" disabled>🔒 Nível ${v.nivel}</button>`;
+    else               acao=`<button class="btn laranja mini" ${S.moedas<v.custo?'disabled':''} data-comprar="${v.id}">🪙 ${fmt(v.custo)}</button>`;
+    div.innerHTML=`
+      <canvas width="130" height="74" data-carro="${v.id}"></canvas>
+      <b>${v.nome}</b>
+      <div class="barras">${barra('FOR',v.power)}${barra('ADE',v.grip)}${barra('SUS',v.susp)}</div>
+      <div class="req">${tem?'':(podeNivel?'':'Requer nível '+v.nivel)}</div>
+      ${acao}`;
+    grade.appendChild(div);
+  }
+  corpo.appendChild(grade);
+  // miniaturas
+  grade.querySelectorAll('canvas[data-carro]').forEach(c=>{
+    const v=VEICULOS.find(o=>o.id===c.dataset.carro); desenharMiniCarro(c,v);
+  });
+  grade.querySelectorAll('[data-usar]').forEach(b=>b.onclick=()=>{
+    S.veiculoSel=b.dataset.usar; Som.ui(); salvar(); renderLoja();
+  });
+  grade.querySelectorAll('[data-comprar]').forEach(b=>b.onclick=()=>{
+    const v=VEICULOS.find(o=>o.id===b.dataset.comprar);
+    if(S.moedas<v.custo) return;
+    S.moedas-=v.custo; S.veiculos.push(v.id); S.veiculoSel=v.id;
+    Som.ui(); toast('🚗','Veículo comprado!',v.nome); salvar(); checarConquistas(); renderLoja(); atualizarMenu();
+  });
+}
+function renderMapas(corpo){
+  const grade=document.createElement('div'); grade.className='grade';
+  for(const m of MAPAS){
+    const tem=S.mapas.includes(m.id);
+    const sel=S.mapaSel===m.id;
+    const podeNivel=S.nivel>=m.nivel;
+    const div=document.createElement('div'); div.className='card'+(sel?' sel':'');
+    let acao;
+    if(sel)            acao=`<button class="btn verde mini" disabled>✓ Em uso</button>`;
+    else if(tem)       acao=`<button class="btn azul mini" data-usarm="${m.id}">Jogar aqui</button>`;
+    else if(!podeNivel)acao=`<button class="btn cinza mini" disabled>🔒 Nível ${m.nivel}</button>`;
+    else               acao=`<button class="btn laranja mini" ${S.moedas<m.custo?'disabled':''} data-comprarm="${m.id}">🪙 ${fmt(m.custo)}</button>`;
+    div.innerHTML=`<canvas width="130" height="74" data-mapa="${m.id}"></canvas><b>${m.nome}</b>
+      <div class="req">${m.noite?'🌙 Noturno':''}</div>${acao}`;
+    grade.appendChild(div);
+  }
+  corpo.appendChild(grade);
+  grade.querySelectorAll('canvas[data-mapa]').forEach(c=>{
+    const m=MAPAS.find(o=>o.id===c.dataset.mapa); desenharMiniMapa(c,m);
+  });
+  grade.querySelectorAll('[data-usarm]').forEach(b=>b.onclick=()=>{
+    S.mapaSel=b.dataset.usarm; Som.ui(); salvar(); renderLoja();
+  });
+  grade.querySelectorAll('[data-comprarm]').forEach(b=>b.onclick=()=>{
+    const m=MAPAS.find(o=>o.id===b.dataset.comprarm);
+    if(S.moedas<m.custo) return;
+    S.moedas-=m.custo; S.mapas.push(m.id); S.mapaSel=m.id;
+    Som.ui(); toast('🗺️','Mapa desbloqueado!',m.nome); salvar(); checarConquistas(); renderLoja(); atualizarMenu();
+  });
+}
+// miniatura de carro num canvas pequeno
+function desenharMiniCarro(c,v){
+  const x=c.getContext('2d'); const sp={larg:60,alt:20,roda:13,cor:v.cor,teto:v.teto,tipo:v.tipo};
+  x.clearRect(0,0,c.width,c.height); x.save(); x.translate(65,46);
+  // chão
+  x.fillStyle='rgba(255,255,255,.06)'; x.fillRect(-65,16,130,12);
+  const ctxBak=window.ctx; window.ctx=x;       // reaproveita as funções de desenho
+  for(const dx of [-22,22]) desenharRoda(dx,8,sp.roda,0);
+  x.fillStyle=sp.cor; desenharChassi(sp.tipo,sp.larg,sp.alt,sp);
+  window.ctx=ctxBak; x.restore();
+}
+// miniatura de mapa
+function desenharMiniMapa(c,m){
+  const x=c.getContext('2d'); const w=c.width,h=c.height;
+  const g=x.createLinearGradient(0,0,0,h); g.addColorStop(0,m.ceu[0]);g.addColorStop(1,m.ceu[2]);
+  x.fillStyle=g; x.fillRect(0,0,w,h);
+  x.fillStyle=m.montanha[1]; x.beginPath(); x.moveTo(0,h*0.6);
+  for(let i=0;i<=w;i+=10) x.lineTo(i,h*0.5+Math.sin(i*0.1)*8); x.lineTo(w,h);x.lineTo(0,h);x.fill();
+  x.fillStyle=m.chao; x.beginPath(); x.moveTo(0,h);
+  for(let i=0;i<=w;i+=8) x.lineTo(i,h*0.72+Math.sin(i*0.16)*6); x.lineTo(w,h);x.fill();
+  if(m.noite){ x.fillStyle='rgba(255,255,255,.85)'; x.beginPath(); x.arc(w*0.8,h*0.25,7,0,7); x.fill(); }
+  else { x.fillStyle='#fff7d6'; x.beginPath(); x.arc(w*0.8,h*0.25,8,0,7); x.fill(); }
+}
+
+/* ----------------------------------------------------------------
+   20. CONQUISTAS (tela)
+   ---------------------------------------------------------------- */
+function abrirConq(){
+  checarConquistas();
+  const corpo=$('#conqCorpo'); corpo.innerHTML='';
+  $('#conqProgresso').textContent=S.conquistas.length+'/'+CONQUISTAS.length;
+  for(const c of CONQUISTAS){
+    const feita=S.conquistas.includes(c.id);
+    const div=document.createElement('div'); div.className='linha-conq'+(feita?' feita':'');
+    div.innerHTML=`<div class="conq-ico">${c.ico}</div>
+      <div><b>${c.nome}</b><small>${c.desc}</small></div>
+      <div class="conq-premio">${feita?'<span class="conq-check">✓</span>':'🪙 '+fmt(c.premio)}</div>`;
+    corpo.appendChild(div);
+  }
+  mostrarTela('telaConq');
+}
+
+/* ----------------------------------------------------------------
+   21. CONFIGURAÇÕES
+   ---------------------------------------------------------------- */
+function abrirConfig(){
+  $('#cfgSom').checked=S.cfg.som; $('#cfgVib').checked=S.cfg.vib; $('#cfgFx').checked=S.cfg.fx;
+  mostrarTela('telaConfig');
+}
+$('#cfgSom').onchange=e=>{ S.cfg.som=e.target.checked; if(!S.cfg.som)Som.motorParar(); salvar(); };
+$('#cfgVib').onchange=e=>{ S.cfg.vib=e.target.checked; salvar(); if(S.cfg.vib)vibrar(20); };
+$('#cfgFx').onchange =e=>{ S.cfg.fx=e.target.checked; salvar(); };
+$('#btnReset').onclick=()=>{
+  if(confirm('Apagar TODO o progresso (moedas, veículos, recorde)? Isso não pode ser desfeito.')){
+    localStorage.removeItem(SAVE_KEY); S=estadoPadrao(); salvar();
+    Som.ui(); atualizarMenu(); abrirConfig(); toast('🗑️','Progresso apagado','Começando do zero');
+  }
+};
+
+/* ----------------------------------------------------------------
+   22. CONTROLES (teclado + touch + clique)
+   ---------------------------------------------------------------- */
+const ehTouch = ('ontouchstart' in window) || navigator.maxTouchPoints>0;
+
+// Teclado
+const teclas={};
+window.addEventListener('keydown',e=>{
+  const k=e.key.toLowerCase();
+  if(['arrowright','arrowleft','arrowup','arrowdown',' '].includes(k)) e.preventDefault();
+  teclas[k]=true; aplicarTeclado();
+  if(k==='p' && (Jogo.estado==='jogando'||Jogo.estado==='pausa')) alternarPausa();
+});
+window.addEventListener('keyup',e=>{ teclas[e.key.toLowerCase()]=false; aplicarTeclado(); });
+function aplicarTeclado(){
+  Jogo.ctrl.gas   = !!(teclas['arrowright']||teclas['d']||teclas['arrowup']||teclas['w']);
+  Jogo.ctrl.freio = !!(teclas['arrowleft'] ||teclas['a']||teclas['arrowdown']||teclas['s']);
+}
+
+// Pedais touch / clique
+function ligarPedal(el, prop){
+  const dn=e=>{ e.preventDefault(); Jogo.ctrl[prop]=true; el.classList.add('apertado'); Som.retomar(); };
+  const up=e=>{ e.preventDefault(); Jogo.ctrl[prop]=false; el.classList.remove('apertado'); };
+  el.addEventListener('touchstart',dn,{passive:false});
+  el.addEventListener('touchend',up); el.addEventListener('touchcancel',up);
+  el.addEventListener('mousedown',dn); el.addEventListener('mouseleave',up);
+  window.addEventListener('mouseup',up);
+}
+ligarPedal($('#btnGas'),'gas');
+ligarPedal($('#btnFreio'),'freio');
+
+// Toque na metade da tela também funciona como acelerar/frear (atalho)
+cv.addEventListener('touchstart',e=>{
+  if(Jogo.estado!=='jogando') return;
+  for(const t of e.changedTouches){
+    if(t.clientX > W*0.5) Jogo.ctrl.gas=true; else Jogo.ctrl.freio=true;
+  }
+},{passive:true});
+cv.addEventListener('touchend',e=>{
+  if(Jogo.estado!=='jogando') return;
+  // se não houver mais toques, solta tudo (os pedais reativam ao tocar neles)
+  if(e.touches.length===0){ /* pedais mantêm seus próprios estados */ }
+},{passive:true});
+
+/* ----------------------------------------------------------------
+   23. PAUSA
+   ---------------------------------------------------------------- */
+function alternarPausa(){
+  if(Jogo.estado==='jogando'){
+    Jogo.estado='pausa'; Som.motorParar(); mostrarTela('telaPausa');
+    $('#hud').classList.add('oculto'); $('#touch').classList.add('oculto');
+  }else if(Jogo.estado==='pausa'){
+    Jogo.estado='jogando'; mostrarTela(null);
+    $('#hud').classList.remove('oculto'); $('#touch').classList.toggle('oculto',!ehTouch);
+    Som.motorLigar();
+  }
+}
+$('#btnPausa').onclick=alternarPausa;
+
+/* ----------------------------------------------------------------
+   24. LIGAÇÃO DOS BOTÕES (data-acao / data-fechar / data-aba)
+   ---------------------------------------------------------------- */
+document.body.addEventListener('click',e=>{
+  const acaoEl=e.target.closest('[data-acao]');
+  const fechaEl=e.target.closest('[data-fechar]');
+  const abaEl=e.target.closest('[data-aba]');
+  if(acaoEl){
+    Som.retomar(); Som.ui();
+    switch(acaoEl.dataset.acao){
+      case 'jogar': iniciarPartida(); break;
+      case 'loja': abrirLoja(); break;
+      case 'conq': abrirConq(); break;
+      case 'config': abrirConfig(); break;
+      case 'continuar': alternarPausa(); break;
+      case 'recomecar': iniciarPartida(); break;
+      case 'menu': voltarMenu(); break;
+    }
+  }
+  if(fechaEl){ Som.ui(); voltarMenu(); }
+  if(abaEl){ abaLoja=abaEl.dataset.aba; Som.ui(); renderLoja(); }
+});
+
+/* ----------------------------------------------------------------
+   25. INÍCIO
+   ---------------------------------------------------------------- */
+function boot(){
+  atualizarMenu();
+  mostrarTela('telaMenu');
+  // primeira interação libera o áudio (política dos navegadores)
+  const liberar=()=>{ Som.retomar(); window.removeEventListener('pointerdown',liberar); };
+  window.addEventListener('pointerdown',liberar);
+  requestAnimationFrame(ts=>{ ultimo=ts; loop(ts); });
+}
+boot();
 </script>
 </body>
 </html>
