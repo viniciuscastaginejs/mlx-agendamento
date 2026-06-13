@@ -728,13 +728,14 @@ const Carro = {
         while(dAng> Math.PI) dAng-=Math.PI*2;
         while(dAng<-Math.PI) dAng+=Math.PI*2;
         this.vAng += dAng * 6.0 * dt;
-        // ---- tração: só a roda traseira (i===0) puxa ----
-        if(temGas && i===0){
-          const dir = (gas - freio);                  // +1 acelera, -1 freia/ré
-          const acel = dir * sp.power / sp.peso * dt;  // aceleração ao longo da rampa
+        // ---- tração 4x4: AS DUAS rodas puxam (sobe morro muito melhor) ----
+        if(temGas){
+          const dir = (gas - freio);                          // +1 acelera, -1 freia/ré
+          const acel = dir * sp.power / sp.peso * dt * 0.60;   // força dividida entre as 2 rodas
           this.vx += Math.cos(inc) * acel;
           this.vy += Math.sin(inc) * acel;
-          this.vAng -= dir * 0.4 * dt;                 // leve tendência a empinar
+          // 4x4 é plantado: traseira tende a empinar, dianteira segura a frente
+          this.vAng -= dir * (i===0 ? 0.30 : -0.18) * dt;
         }
       } else {
         r.comp = lerp(r.comp, 0, clamp(dt*8,0,1));
