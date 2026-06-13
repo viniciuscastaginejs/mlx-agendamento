@@ -2,769 +2,427 @@
 <html lang="pt-BR">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>mlx organização</title>
-<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=Syne:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>Vinícius Gameplay – Joguinho Online</title>
 <style>
-  :root {
-    --bg: #0e0b1a;
-    --bg2: #150f27;
-    --bg3: #1c1535;
-    --card: #1e1638;
-    --card2: #261d47;
-    --border: rgba(139, 92, 246, 0.18);
-    --border2: rgba(139, 92, 246, 0.35);
-    --purple: #8b5cf6;
-    --purple2: #a78bfa;
-    --purple3: #c4b5fd;
-    --purple-dim: rgba(139, 92, 246, 0.12);
-    --purple-glow: rgba(139, 92, 246, 0.25);
-    --text: #f0eaff;
-    --text2: #a89ec4;
-    --text3: #6b608a;
-    --green: #34d399;
-    --red: #f87171;
-    --amber: #fbbf24;
-    --mono: 'DM Mono', monospace;
-    --display: 'Syne', sans-serif;
-  }
-
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-
-  body {
-    background: var(--bg);
-    color: var(--text);
-    font-family: var(--display);
-    min-height: 100vh;
-    overflow-x: hidden;
-  }
-
-  /* Noise overlay */
-  body::before {
-    content: '';
-    position: fixed;
-    inset: 0;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.04'/%3E%3C/svg%3E");
-    pointer-events: none;
-    z-index: 0;
-    opacity: 0.4;
-  }
-
-  /* Ambient glow */
-  body::after {
-    content: '';
-    position: fixed;
-    top: -200px;
-    left: 50%;
-    transform: translateX(-50%);
-    width: 600px;
-    height: 400px;
-    background: radial-gradient(ellipse, rgba(139,92,246,0.15) 0%, transparent 70%);
-    pointer-events: none;
-    z-index: 0;
-  }
-
-  .app {
-    position: relative;
-    z-index: 1;
-    max-width: 820px;
-    margin: 0 auto;
-    padding: 32px 24px 80px;
-  }
-
-  /* ── Header ── */
-  header {
-    display: flex;
-    align-items: flex-end;
-    justify-content: space-between;
-    margin-bottom: 36px;
-  }
-
-  .logo {
-    font-size: 13px;
-    font-weight: 600;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: var(--purple);
-    font-family: var(--mono);
-  }
-
-  .logo span { color: var(--text3); }
-
-  .header-date {
-    text-align: right;
-  }
-
-  .header-date .day {
-    font-size: 42px;
-    font-weight: 800;
-    line-height: 1;
-    color: var(--text);
-    letter-spacing: -2px;
-  }
-
-  .header-date .month {
-    font-size: 13px;
-    color: var(--text3);
-    font-family: var(--mono);
-    letter-spacing: 0.1em;
-    margin-top: 2px;
-  }
-
-  /* ── Stats bar ── */
-  .stats {
-    display: grid;
-    grid-template-columns: repeat(3, 1fr);
-    gap: 10px;
-    margin-bottom: 28px;
-  }
-
-  .stat {
-    background: var(--card);
-    border: 0.5px solid var(--border);
-    border-radius: 12px;
-    padding: 14px 16px;
-    position: relative;
-    overflow: hidden;
-  }
-
-  .stat::before {
-    content: '';
-    position: absolute;
-    top: 0; left: 0; right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, transparent, var(--purple), transparent);
-    opacity: 0.5;
-  }
-
-  .stat-val {
-    font-size: 28px;
-    font-weight: 800;
-    color: var(--text);
-    line-height: 1;
-    font-family: var(--mono);
-  }
-
-  .stat-val.green { color: var(--green); }
-  .stat-val.purple { color: var(--purple2); }
-
-  .stat-label {
-    font-size: 11px;
-    color: var(--text3);
-    font-family: var(--mono);
-    letter-spacing: 0.08em;
-    margin-top: 5px;
-    text-transform: uppercase;
-  }
-
-  /* Progress bar */
-  .progress-wrap {
-    margin-bottom: 28px;
-  }
-
-  .progress-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin-bottom: 8px;
-  }
-
-  .progress-header span {
-    font-size: 11px;
-    font-family: var(--mono);
-    color: var(--text3);
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-  }
-
-  .progress-header .pct {
-    color: var(--purple2);
-    font-weight: 500;
-  }
-
-  .progress-track {
-    height: 3px;
-    background: var(--bg3);
-    border-radius: 3px;
-    overflow: hidden;
-  }
-
-  .progress-fill {
-    height: 100%;
-    background: linear-gradient(90deg, var(--purple), var(--purple3));
-    border-radius: 3px;
-    transition: width 0.4s cubic-bezier(0.4, 0, 0.2, 1);
-  }
-
-  /* ── Add task form ── */
-  .add-form {
-    background: var(--card);
-    border: 0.5px solid var(--border2);
-    border-radius: 14px;
-    padding: 18px;
-    margin-bottom: 28px;
-    display: grid;
-    grid-template-columns: 1fr auto auto;
-    gap: 10px;
-    align-items: center;
-  }
-
-  .add-form input[type="text"],
-  .add-form input[type="time"] {
-    background: var(--bg3);
-    border: 0.5px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 14px;
-    font-size: 14px;
-    font-family: var(--display);
-    color: var(--text);
-    outline: none;
-    transition: border-color 0.2s;
-  }
-
-  .add-form input[type="text"]::placeholder { color: var(--text3); }
-
-  .add-form input:focus {
-    border-color: var(--purple);
-    box-shadow: 0 0 0 3px rgba(139,92,246,0.12);
-  }
-
-  .add-form input[type="time"] {
-    font-family: var(--mono);
-    font-size: 13px;
-    width: 110px;
-    color: var(--purple2);
-  }
-
-  .tag-select {
-    background: var(--bg3);
-    border: 0.5px solid var(--border);
-    border-radius: 8px;
-    padding: 10px 12px;
-    font-size: 13px;
-    font-family: var(--mono);
-    color: var(--text2);
-    outline: none;
-    cursor: pointer;
-  }
-
-  .btn-add {
-    background: var(--purple);
-    border: none;
-    border-radius: 8px;
-    padding: 10px 18px;
-    font-size: 13px;
-    font-weight: 600;
-    font-family: var(--display);
-    color: #fff;
-    cursor: pointer;
-    letter-spacing: 0.04em;
-    transition: all 0.18s;
-    white-space: nowrap;
-  }
-
-  .btn-add:hover {
-    background: var(--purple2);
-    transform: translateY(-1px);
-  }
-
-  .btn-add:active { transform: scale(0.97); }
-
-  .add-form-row2 {
-    grid-column: 1 / -1;
-    display: flex;
-    gap: 10px;
-    align-items: center;
-  }
-
-  /* ── Section header ── */
-  .section-label {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    margin-bottom: 12px;
-  }
-
-  .section-label span {
-    font-size: 11px;
-    font-family: var(--mono);
-    letter-spacing: 0.15em;
-    text-transform: uppercase;
-    color: var(--text3);
-  }
-
-  .section-label::after {
-    content: '';
-    flex: 1;
-    height: 0.5px;
-    background: var(--border);
-  }
-
-  /* ── Task list ── */
-  #task-list { margin-bottom: 32px; }
-
-  .task-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px 16px;
-    background: var(--card);
-    border: 0.5px solid var(--border);
-    border-radius: 10px;
-    margin-bottom: 7px;
-    cursor: pointer;
-    transition: all 0.18s;
-    position: relative;
-    overflow: hidden;
-    animation: fadeIn 0.25s ease;
-  }
-
-  @keyframes fadeIn {
-    from { opacity: 0; transform: translateY(6px); }
-    to { opacity: 1; transform: translateY(0); }
-  }
-
-  .task-item::before {
-    content: '';
-    position: absolute;
-    left: 0; top: 0; bottom: 0;
-    width: 2.5px;
-    background: var(--purple);
-    opacity: 0;
-    transition: opacity 0.18s;
-    border-radius: 2px 0 0 2px;
-  }
-
-  .task-item:hover { border-color: var(--border2); background: var(--card2); }
-  .task-item:hover::before { opacity: 0.6; }
-
-  .task-item.done {
-    opacity: 0.55;
-  }
-
-  .task-item.done::before {
-    opacity: 1;
-    background: var(--green);
-  }
-
-  .check-circle {
-    width: 20px;
-    height: 20px;
-    border-radius: 50%;
-    border: 1.5px solid var(--border2);
-    flex-shrink: 0;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    transition: all 0.18s;
-    font-size: 11px;
-    color: transparent;
-  }
-
-  .task-item.done .check-circle {
-    background: var(--green);
-    border-color: var(--green);
-    color: #0e0b1a;
-    font-size: 12px;
-  }
-
-  .task-time {
-    font-family: var(--mono);
-    font-size: 12px;
-    color: var(--purple2);
-    min-width: 44px;
-    flex-shrink: 0;
-  }
-
-  .task-text {
-    flex: 1;
-    font-size: 14px;
-    color: var(--text);
-    font-weight: 400;
-    line-height: 1.4;
-    transition: color 0.18s;
-  }
-
-  .task-item.done .task-text {
-    text-decoration: line-through;
-    color: var(--text3);
-  }
-
-  .task-tag {
-    font-size: 10px;
-    font-family: var(--mono);
-    letter-spacing: 0.07em;
-    padding: 3px 9px;
-    border-radius: 20px;
-    font-weight: 500;
-  }
-
-  .tag-work    { background: rgba(139,92,246,0.18); color: var(--purple3); }
-  .tag-pessoal { background: rgba(167,139,250,0.12); color: var(--purple2); }
-  .tag-faculdade { background: rgba(52,211,153,0.12); color: #6ee7b7; }
-  .tag-saude   { background: rgba(251,191,36,0.12); color: #fde68a; }
-  .tag-outro   { background: rgba(248,113,113,0.1); color: #fca5a5; }
-
-  .del-btn {
-    background: none;
-    border: none;
-    cursor: pointer;
-    color: var(--text3);
-    font-size: 16px;
-    line-height: 1;
-    padding: 2px 4px;
-    border-radius: 4px;
-    opacity: 0;
-    transition: all 0.15s;
-  }
-
-  .task-item:hover .del-btn { opacity: 1; }
-  .del-btn:hover { color: var(--red); }
-
-  /* ── Empty state ── */
-  .empty {
-    text-align: center;
-    padding: 40px 0;
-    color: var(--text3);
-    font-size: 14px;
-    font-family: var(--mono);
-    letter-spacing: 0.04em;
-  }
-
-  .empty span {
-    display: block;
-    font-size: 32px;
-    margin-bottom: 10px;
-    opacity: 0.3;
-  }
-
-  /* ── Time blocks section ── */
-  .timeline { position: relative; }
-
-  .timeline-item {
-    display: flex;
-    gap: 16px;
-    margin-bottom: 4px;
-    align-items: stretch;
-  }
-
-  .tl-time {
-    font-family: var(--mono);
-    font-size: 11px;
-    color: var(--text3);
-    width: 42px;
-    flex-shrink: 0;
-    padding-top: 14px;
-    text-align: right;
-    letter-spacing: 0.04em;
-  }
-
-  .tl-line {
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    width: 20px;
-    flex-shrink: 0;
-  }
-
-  .tl-dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-    background: var(--border2);
-    margin-top: 17px;
-    flex-shrink: 0;
-    transition: background 0.2s;
-  }
-
-  .tl-connector {
-    flex: 1;
-    width: 1px;
-    background: var(--border);
-    min-height: 8px;
-  }
-
-  .tl-card {
-    flex: 1;
-    background: var(--card);
-    border: 0.5px solid var(--border);
-    border-radius: 10px;
-    padding: 11px 14px;
-    margin-bottom: 4px;
-    cursor: pointer;
-    transition: all 0.18s;
-  }
-
-  .tl-card:hover { border-color: var(--border2); background: var(--card2); }
-
-  .tl-card.done { opacity: 0.45; }
-
-  .tl-card .tl-title {
-    font-size: 14px;
-    color: var(--text);
-    font-weight: 500;
-    line-height: 1.3;
-  }
-
-  .tl-card.done .tl-title {
-    text-decoration: line-through;
-    color: var(--text3);
-  }
-
-  .tl-card .tl-tag {
-    font-family: var(--mono);
-    font-size: 10px;
-    color: var(--text3);
-    margin-top: 3px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-  }
-
-  .tl-dot.has-task { background: var(--purple); box-shadow: 0 0 6px var(--purple-glow); }
-  .tl-dot.done-task { background: var(--green); box-shadow: 0 0 6px rgba(52,211,153,0.3); }
-
-  /* ── View toggle ── */
-  .view-toggle {
-    display: flex;
-    gap: 6px;
-    margin-bottom: 16px;
-  }
-
-  .view-btn {
-    background: var(--bg3);
-    border: 0.5px solid var(--border);
-    border-radius: 8px;
-    padding: 7px 14px;
-    font-size: 12px;
-    font-family: var(--mono);
-    color: var(--text3);
-    cursor: pointer;
-    letter-spacing: 0.06em;
-    transition: all 0.18s;
-  }
-
-  .view-btn.active {
-    background: var(--purple-dim);
-    border-color: var(--purple);
-    color: var(--purple2);
-  }
-
-  /* ── Footer ── */
-  .footer {
-    margin-top: 48px;
-    text-align: center;
-    font-size: 11px;
-    font-family: var(--mono);
-    color: var(--text3);
-    letter-spacing: 0.12em;
-    text-transform: uppercase;
-  }
+/* ============================================================
+   VINÍCIUS GAMEPLAY – Joguinho Online
+   Estilos da interface (HUD, menus, loja, conquistas...)
+   ============================================================ */
+:root{
+  --laranja:#ff9d2e; --laranja2:#ff7a1a; --laranja-s:#a04a00;
+  --verde:#46cf6e;  --verde2:#1fa84c;  --verde-s:#0e6b2d;
+  --azul:#3fa4ff;   --azul2:#1f7ddb;   --azul-s:#11518f;
+  --roxo:#a268ff;   --roxo2:#7a3ff0;   --roxo-s:#4a2496;
+  --cinza:#8a97a8;  --cinza2:#5f6c7d;  --cinza-s:#39434f;
+  --verm:#ff5d52;   --verm2:#d8372e;   --verm-s:#8c1d17;
+  --painel:rgba(12,19,32,.92);
+  --painel2:rgba(255,255,255,.06);
+  --borda:rgba(255,255,255,.12);
+  --texto:#eef3fa; --texto2:#9fb0c4;
+  --fonte:"Trebuchet MS","Segoe UI",system-ui,-apple-system,sans-serif;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+html,body{height:100%;overflow:hidden;overscroll-behavior:none}
+body{
+  font-family:var(--fonte);color:var(--texto);background:#0b1322;
+  user-select:none;-webkit-user-select:none;touch-action:none;
+}
+#jogo{position:fixed;inset:0;display:block}
+.oculto{display:none !important}
+button{font-family:inherit;cursor:pointer;border:0;color:inherit;background:none}
+
+/* ---------- Botões ---------- */
+.btn{
+  display:inline-flex;align-items:center;justify-content:center;gap:.5em;
+  font-weight:800;font-size:1rem;letter-spacing:.3px;color:#fff;
+  padding:13px 24px;border-radius:16px;
+  background:linear-gradient(180deg,var(--cinza),var(--cinza2));
+  box-shadow:0 5px 0 var(--cinza-s),0 10px 18px rgba(0,0,0,.4);
+  transition:transform .07s ease,box-shadow .07s ease,filter .15s;
+  text-shadow:0 1px 2px rgba(0,0,0,.35);
+}
+.btn:hover{filter:brightness(1.08)}
+.btn:active{transform:translateY(4px);box-shadow:0 1px 0 var(--cinza-s),0 4px 8px rgba(0,0,0,.35)}
+.btn.laranja{background:linear-gradient(180deg,var(--laranja),var(--laranja2));box-shadow:0 5px 0 var(--laranja-s),0 10px 18px rgba(0,0,0,.4)}
+.btn.laranja:active{box-shadow:0 1px 0 var(--laranja-s)}
+.btn.verde{background:linear-gradient(180deg,var(--verde),var(--verde2));box-shadow:0 5px 0 var(--verde-s),0 10px 18px rgba(0,0,0,.4)}
+.btn.verde:active{box-shadow:0 1px 0 var(--verde-s)}
+.btn.azul{background:linear-gradient(180deg,var(--azul),var(--azul2));box-shadow:0 5px 0 var(--azul-s),0 10px 18px rgba(0,0,0,.4)}
+.btn.azul:active{box-shadow:0 1px 0 var(--azul-s)}
+.btn.roxo{background:linear-gradient(180deg,var(--roxo),var(--roxo2));box-shadow:0 5px 0 var(--roxo-s),0 10px 18px rgba(0,0,0,.4)}
+.btn.roxo:active{box-shadow:0 1px 0 var(--roxo-s)}
+.btn.verm{background:linear-gradient(180deg,var(--verm),var(--verm2));box-shadow:0 5px 0 var(--verm-s),0 10px 18px rgba(0,0,0,.4)}
+.btn.verm:active{box-shadow:0 1px 0 var(--verm-s)}
+.btn.grande{font-size:1.35rem;padding:18px 48px;border-radius:20px}
+.btn.mini{font-size:.85rem;padding:8px 14px;border-radius:12px;box-shadow:0 3px 0 rgba(0,0,0,.45)}
+.btn.mini:active{transform:translateY(2px);box-shadow:0 1px 0 rgba(0,0,0,.45)}
+.btn:disabled{filter:grayscale(.8) brightness(.7);cursor:not-allowed}
+.btn:disabled:active{transform:none}
+.btn-redondo{
+  width:46px;height:46px;border-radius:50%;font-weight:900;font-size:1.05rem;color:#fff;
+  background:rgba(10,16,28,.62);border:2px solid rgba(255,255,255,.25);
+  backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;
+}
+.btn-redondo:active{transform:scale(.92)}
+
+/* ---------- Chips ---------- */
+.chip{
+  display:inline-flex;align-items:center;gap:.4em;font-weight:700;font-size:.85rem;
+  background:rgba(10,16,28,.62);border:1px solid var(--borda);
+  padding:6px 12px;border-radius:999px;backdrop-filter:blur(4px);white-space:nowrap;
+}
+.chip b{color:#ffd66b}
+
+/* ---------- Telas (overlays) ---------- */
+.tela{
+  position:fixed;inset:0;z-index:20;display:flex;flex-direction:column;
+  align-items:center;justify-content:center;gap:20px;
+  padding:max(16px,env(safe-area-inset-top)) 16px max(16px,env(safe-area-inset-bottom));
+  animation:surgir .25s ease;
+}
+@keyframes surgir{from{opacity:0;transform:scale(1.02)}to{opacity:1;transform:none}}
+.tela.escura{background:rgba(5,9,17,.55);backdrop-filter:blur(3px)}
+
+/* ---------- Logo / Menu ---------- */
+.logo{text-align:center;animation:flutuar 4s ease-in-out infinite}
+@keyframes flutuar{0%,100%{transform:translateY(0)}50%{transform:translateY(-9px)}}
+.logo h1{
+  font-size:clamp(2.4rem,9.5vw,4.6rem);line-height:.95;font-weight:900;font-style:italic;
+  text-transform:uppercase;letter-spacing:-1px;
+  background:linear-gradient(180deg,#fff6c8 0%,#ffd23e 45%,#ff8c1a 100%);
+  -webkit-background-clip:text;background-clip:text;color:transparent;
+  filter:drop-shadow(0 3px 0 #7c3c00) drop-shadow(0 9px 16px rgba(0,0,0,.55));
+}
+.logo-sub{
+  display:inline-block;margin-bottom:10px;font-weight:800;font-size:.95rem;letter-spacing:2px;
+  text-transform:uppercase;color:#ffe9b8;background:rgba(10,16,28,.72);
+  border:1px solid rgba(255,210,90,.35);padding:6px 16px;border-radius:999px;
+}
+.menu-botoes{display:flex;flex-direction:column;align-items:center;gap:14px}
+.menu-linha{display:flex;gap:12px;flex-wrap:wrap;justify-content:center}
+.menu-rodape{display:flex;gap:10px;flex-wrap:wrap;justify-content:center}
+.versao{position:absolute;bottom:8px;right:12px;font-size:.7rem;color:rgba(255,255,255,.4)}
+
+/* ---------- Painéis ---------- */
+.painel{
+  width:min(560px,94vw);max-height:min(82vh,720px);display:flex;flex-direction:column;
+  background:var(--painel);border:1px solid var(--borda);border-radius:22px;
+  box-shadow:0 24px 60px rgba(0,0,0,.6);overflow:hidden;
+}
+.painel-topo{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  padding:14px 18px;border-bottom:1px solid var(--borda);background:rgba(255,255,255,.04);
+}
+.painel-topo h2{font-size:1.15rem;font-weight:900;letter-spacing:.4px;text-transform:uppercase}
+.painel-corpo{padding:14px 16px;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y}
+.fechar{width:38px;height:38px;border-radius:12px;background:rgba(255,255,255,.08);font-weight:900;font-size:1rem;color:#fff;flex:none}
+.fechar:active{transform:scale(.9)}
+
+/* ---------- Abas da loja ---------- */
+.abas{display:flex;gap:6px;padding:10px 14px 0}
+.aba{
+  flex:1;padding:10px 6px;border-radius:12px 12px 0 0;font-weight:800;font-size:.85rem;color:var(--texto2);
+  background:rgba(255,255,255,.04);border:1px solid transparent;border-bottom:0;
+}
+.aba.ativa{color:#fff;background:rgba(255,255,255,.1);border-color:var(--borda)}
+
+/* ---------- Loja: melhorias ---------- */
+.saldo{font-weight:900;color:#ffd66b;font-size:1rem;white-space:nowrap}
+.linha-up{
+  display:flex;align-items:center;gap:12px;padding:12px;border-radius:16px;margin-bottom:10px;
+  background:var(--painel2);border:1px solid var(--borda);
+}
+.up-ico{font-size:1.7rem;width:46px;height:46px;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.07);border-radius:13px}
+.up-info{flex:1;min-width:0}
+.up-info b{display:block;font-size:.95rem}
+.up-info small{color:var(--texto2);font-size:.74rem;display:block;margin-top:2px}
+.pips{display:flex;gap:4px;margin-top:5px}
+.pip{width:18px;height:7px;border-radius:4px;background:rgba(255,255,255,.14)}
+.pip.cheio{background:linear-gradient(180deg,#7ee08e,#2ea84f);box-shadow:0 0 6px rgba(70,207,110,.5)}
+
+/* ---------- Loja: veículos e mapas ---------- */
+.grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:10px}
+.card{
+  background:var(--painel2);border:1px solid var(--borda);border-radius:16px;
+  padding:10px;display:flex;flex-direction:column;align-items:center;gap:7px;text-align:center;
+}
+.card.sel{border-color:#ffd23e;box-shadow:0 0 0 2px rgba(255,210,62,.35),0 0 18px rgba(255,180,40,.25)}
+.card canvas{width:100%;height:auto;border-radius:10px;background:rgba(255,255,255,.05)}
+.card b{font-size:.85rem;line-height:1.15}
+.card .req{font-size:.72rem;color:var(--texto2)}
+.barras{width:100%;display:flex;flex-direction:column;gap:3px}
+.barra{display:flex;align-items:center;gap:6px;font-size:.62rem;color:var(--texto2)}
+.barra span{width:30px;text-align:left;flex:none}
+.barra-t{flex:1;height:6px;border-radius:3px;background:rgba(255,255,255,.1);overflow:hidden}
+.barra-v{height:100%;border-radius:3px;background:linear-gradient(90deg,#ffd23e,#ff8c1a)}
+
+/* ---------- Conquistas ---------- */
+.linha-conq{
+  display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:14px;margin-bottom:8px;
+  background:var(--painel2);border:1px solid var(--borda);opacity:.55;
+}
+.linha-conq.feita{opacity:1;border-color:rgba(255,210,62,.45);background:linear-gradient(90deg,rgba(255,180,40,.12),rgba(255,255,255,.05))}
+.conq-ico{font-size:1.5rem;width:42px;height:42px;flex:none;display:flex;align-items:center;justify-content:center;background:rgba(255,255,255,.07);border-radius:12px}
+.linha-conq b{display:block;font-size:.9rem}
+.linha-conq small{color:var(--texto2);font-size:.74rem}
+.conq-premio{margin-left:auto;font-weight:800;font-size:.8rem;color:#ffd66b;white-space:nowrap}
+.conq-check{color:#7ee08e;font-weight:900}
+
+/* ---------- Configurações ---------- */
+.tog{
+  display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:13px 14px;border-radius:14px;margin-bottom:10px;font-weight:700;font-size:.95rem;
+  background:var(--painel2);border:1px solid var(--borda);
+}
+.tog small{display:block;font-weight:400;color:var(--texto2);font-size:.74rem;margin-top:2px}
+.tog input{display:none}
+.interruptor{
+  width:52px;height:30px;flex:none;border-radius:999px;background:rgba(255,255,255,.14);
+  position:relative;transition:background .2s;cursor:pointer;
+}
+.interruptor::after{
+  content:"";position:absolute;top:3px;left:3px;width:24px;height:24px;border-radius:50%;
+  background:#fff;transition:left .2s;box-shadow:0 2px 5px rgba(0,0,0,.4);
+}
+.tog input:checked + .interruptor{background:linear-gradient(180deg,var(--verde),var(--verde2))}
+.tog input:checked + .interruptor::after{left:25px}
+
+/* ---------- HUD ---------- */
+#hud{position:fixed;inset:0;z-index:10;pointer-events:none}
+.hud-topo{
+  position:absolute;top:max(10px,env(safe-area-inset-top));left:12px;right:12px;
+  display:flex;align-items:center;gap:10px;
+}
+.hud-fuel{display:flex;align-items:center;gap:7px;flex:1;max-width:230px}
+.fuel-ico{font-size:1.25rem;filter:drop-shadow(0 2px 3px rgba(0,0,0,.5))}
+.fuel-trilho{
+  flex:1;height:16px;border-radius:9px;background:rgba(8,13,24,.65);
+  border:1px solid rgba(255,255,255,.22);overflow:hidden;
+}
+#fuelBar{
+  height:100%;width:100%;border-radius:8px;transition:width .15s linear;
+  background:linear-gradient(180deg,#8df09b,#2ea84f);
+}
+#fuelBar.baixo{background:linear-gradient(180deg,#ffb35c,#f07f1d)}
+#fuelBar.critico{background:linear-gradient(180deg,#ff7a6e,#d8372e);animation:piscar .5s steps(2) infinite}
+@keyframes piscar{50%{opacity:.45}}
+.hud-dist{
+  position:absolute;left:50%;transform:translateX(-50%);top:0;
+  font-size:clamp(1.2rem,4.5vw,1.8rem);font-weight:900;font-style:italic;letter-spacing:.5px;
+  text-shadow:0 2px 0 rgba(0,0,0,.45),0 5px 12px rgba(0,0,0,.4);white-space:nowrap;
+}
+.hud-dir{margin-left:auto;display:flex;align-items:center;gap:8px}
+.hud-sub{
+  position:absolute;top:calc(max(10px,env(safe-area-inset-top)) + 44px);left:12px;
+  display:flex;gap:8px;flex-wrap:wrap;
+}
+#btnPausa{pointer-events:auto}
+.aviso-jogo{
+  position:absolute;bottom:32vh;left:50%;transform:translateX(-50%);
+  font-weight:800;font-size:.95rem;color:#fff;background:rgba(8,13,24,.7);
+  border:1px solid var(--borda);padding:10px 18px;border-radius:999px;white-space:nowrap;
+  animation:sumir 4.5s ease forwards;
+}
+@keyframes sumir{0%,70%{opacity:1}100%{opacity:0}}
+
+/* ---------- Pedais touch ---------- */
+#touch{position:fixed;inset:0;z-index:11;pointer-events:none}
+.pedal{
+  position:absolute;bottom:max(18px,env(safe-area-inset-bottom));
+  width:clamp(110px,24vw,170px);height:clamp(82px,16vw,116px);
+  border-radius:22px;font-weight:900;font-size:clamp(.9rem,2.6vw,1.15rem);color:#fff;
+  pointer-events:auto;letter-spacing:1px;text-shadow:0 2px 3px rgba(0,0,0,.5);
+  border:2px solid rgba(255,255,255,.28);
+  transition:transform .06s,filter .06s;
+}
+.pedal.freio{left:max(14px,env(safe-area-inset-left));background:linear-gradient(180deg,rgba(255,93,82,.85),rgba(165,33,26,.85));box-shadow:0 6px 0 rgba(90,12,8,.8),0 12px 22px rgba(0,0,0,.45)}
+.pedal.gas{right:max(14px,env(safe-area-inset-right));background:linear-gradient(180deg,rgba(86,214,118,.85),rgba(20,128,58,.85));box-shadow:0 6px 0 rgba(8,72,30,.8),0 12px 22px rgba(0,0,0,.45)}
+.pedal.apertado{transform:translateY(5px) scale(.97);filter:brightness(1.18);box-shadow:0 1px 0 rgba(0,0,0,.6)}
+
+/* ---------- Fim de corrida ---------- */
+.fim-titulo{font-size:clamp(1.7rem,7vw,2.6rem);font-weight:900;font-style:italic;text-transform:uppercase;
+  text-shadow:0 3px 0 rgba(0,0,0,.4),0 8px 18px rgba(0,0,0,.45)}
+.fim-sub{color:var(--texto2);font-weight:700;margin-top:-12px}
+.fim-stats{display:flex;flex-direction:column;gap:8px;width:min(360px,88vw)}
+.fim-linha{
+  display:flex;justify-content:space-between;align-items:center;font-weight:700;font-size:1rem;
+  background:var(--painel);border:1px solid var(--borda);border-radius:14px;padding:11px 16px;
+}
+.fim-linha b{color:#ffd66b;font-size:1.05rem}
+.selo-recorde{
+  font-weight:900;font-size:.95rem;color:#3a2400;background:linear-gradient(180deg,#ffe27a,#ffb02e);
+  padding:7px 18px;border-radius:999px;box-shadow:0 4px 12px rgba(255,170,40,.45);
+  animation:pulsar 1s ease-in-out infinite;
+}
+@keyframes pulsar{50%{transform:scale(1.07)}}
+
+/* ---------- Toasts ---------- */
+#toasts{position:fixed;top:max(64px,calc(env(safe-area-inset-top) + 56px));left:50%;transform:translateX(-50%);
+  z-index:40;display:flex;flex-direction:column;gap:8px;align-items:center;pointer-events:none}
+.toast{
+  display:flex;align-items:center;gap:10px;font-weight:800;font-size:.9rem;
+  background:var(--painel);border:1px solid rgba(255,210,62,.5);border-radius:999px;
+  padding:10px 18px;box-shadow:0 10px 26px rgba(0,0,0,.5);white-space:nowrap;
+  animation:toastAnim 3.4s ease forwards;
+}
+.toast .t-ico{font-size:1.2rem}
+.toast small{color:#ffd66b;font-weight:800}
+@keyframes toastAnim{
+  0%{opacity:0;transform:translateY(-16px) scale(.9)}
+  10%,82%{opacity:1;transform:none}
+  100%{opacity:0;transform:translateY(-10px) scale(.95)}
+}
+
+@media (max-height:480px){
+  .logo h1{font-size:2.1rem}
+  .tela{gap:12px}
+  .btn.grande{font-size:1.1rem;padding:13px 36px}
+  .painel{max-height:92vh}
+}
 </style>
 </head>
 <body>
-<div class="app">
 
-  <header>
-    <div>
-      <div class="logo">mlx<span> /</span> organização</div>
-    </div>
-    <div class="header-date">
-      <div class="day" id="hdr-day"></div>
-      <div class="month" id="hdr-month"></div>
-    </div>
-  </header>
+<canvas id="jogo"></canvas>
 
-  <div class="stats">
-    <div class="stat">
-      <div class="stat-val purple" id="stat-total">0</div>
-      <div class="stat-label">tarefas</div>
+<!-- ===================== HUD (durante a partida) ===================== -->
+<div id="hud" class="oculto">
+  <div class="hud-topo">
+    <div class="hud-fuel">
+      <span class="fuel-ico">⛽</span>
+      <div class="fuel-trilho"><div id="fuelBar"></div></div>
     </div>
-    <div class="stat">
-      <div class="stat-val green" id="stat-done">0</div>
-      <div class="stat-label">concluídas</div>
-    </div>
-    <div class="stat">
-      <div class="stat-val" id="stat-pct" style="color:var(--text2)">0%</div>
-      <div class="stat-label">progresso</div>
+    <div id="hudDist" class="hud-dist">0 m</div>
+    <div class="hud-dir">
+      <span class="chip">🪙 <b id="hudMoedas">0</b></span>
+      <button id="btnPausa" class="btn-redondo" aria-label="Pausar">❚❚</button>
     </div>
   </div>
-
-  <div class="progress-wrap">
-    <div class="progress-header">
-      <span>progresso do dia</span>
-      <span class="pct" id="pct-label">0%</span>
-    </div>
-    <div class="progress-track">
-      <div class="progress-fill" id="prog-fill" style="width:0%"></div>
-    </div>
+  <div class="hud-sub">
+    <span class="chip" id="hudNivel">⭐ Nível 1</span>
+    <span class="chip" id="hudRec">🏆 0 m</span>
   </div>
-
-  <div class="add-form">
-    <input type="text" id="input-task" placeholder="Adicionar tarefa..." />
-    <input type="time" id="input-time" />
-    <select class="tag-select" id="input-tag">
-      <option value="work">work</option>
-      <option value="pessoal">pessoal</option>
-      <option value="faculdade">faculdade</option>
-      <option value="saude">saúde</option>
-      <option value="outro">outro</option>
-    </select>
-    <button class="btn-add" onclick="addTask()">+ add</button>
-  </div>
-
-  <div class="view-toggle">
-    <button class="view-btn active" onclick="setView('list')" id="btn-list">lista</button>
-    <button class="view-btn" onclick="setView('timeline')" id="btn-timeline">timeline</button>
-  </div>
-
-  <div class="section-label"><span>tarefas de hoje</span></div>
-
-  <div id="task-list"></div>
-  <div id="timeline-view" style="display:none"></div>
-
-  <div class="footer">mlx organização — feito pra você 🖤</div>
+  <div id="avisoJogo" class="aviso-jogo oculto"></div>
 </div>
 
+<!-- ===================== Pedais (touch / clique) ===================== -->
+<div id="touch" class="oculto">
+  <button class="pedal freio" id="btnFreio">◀ FREIO</button>
+  <button class="pedal gas" id="btnGas">GÁS ▶</button>
+</div>
+
+<!-- ===================== Menu principal ===================== -->
+<div id="telaMenu" class="tela">
+  <div class="logo">
+    <span class="logo-sub">🏁 Joguinho Online</span>
+    <h1>Vinícius<br>Gameplay</h1>
+  </div>
+  <div class="menu-botoes">
+    <button class="btn laranja grande" data-acao="jogar">▶&nbsp; Jogar</button>
+    <div class="menu-linha">
+      <button class="btn azul" data-acao="loja">🛒 Loja</button>
+      <button class="btn roxo" data-acao="conq">🏆 Conquistas</button>
+      <button class="btn cinza" data-acao="config">⚙️ Configurações</button>
+    </div>
+  </div>
+  <div class="menu-rodape">
+    <span class="chip">🪙 <b id="menuMoedas">0</b></span>
+    <span class="chip" id="menuNivel">⭐ Nível 1</span>
+    <span class="chip" id="menuRec">🏆 Recorde 0 m</span>
+  </div>
+  <span class="versao">v1.0 • HTML5</span>
+</div>
+
+<!-- ===================== Loja ===================== -->
+<div id="telaLoja" class="tela escura oculto">
+  <div class="painel">
+    <div class="painel-topo">
+      <h2>🛒 Loja</h2>
+      <span class="saldo">🪙 <span id="lojaMoedas">0</span></span>
+      <button class="fechar" data-fechar="telaLoja">✕</button>
+    </div>
+    <div class="abas">
+      <button class="aba ativa" data-aba="melhorias">🔧 Melhorias</button>
+      <button class="aba" data-aba="veiculos">🚗 Veículos</button>
+      <button class="aba" data-aba="mapas">🗺️ Mapas</button>
+    </div>
+    <div class="painel-corpo" id="lojaCorpo"></div>
+  </div>
+</div>
+
+<!-- ===================== Conquistas ===================== -->
+<div id="telaConq" class="tela escura oculto">
+  <div class="painel">
+    <div class="painel-topo">
+      <h2>🏆 Conquistas</h2>
+      <span class="saldo" id="conqProgresso">0/0</span>
+      <button class="fechar" data-fechar="telaConq">✕</button>
+    </div>
+    <div class="painel-corpo" id="conqCorpo"></div>
+  </div>
+</div>
+
+<!-- ===================== Configurações ===================== -->
+<div id="telaConfig" class="tela escura oculto">
+  <div class="painel">
+    <div class="painel-topo">
+      <h2>⚙️ Configurações</h2>
+      <button class="fechar" data-fechar="telaConfig">✕</button>
+    </div>
+    <div class="painel-corpo">
+      <label class="tog"><div>🔊 Sons<small>Motor, moedas e interface</small></div>
+        <input type="checkbox" id="cfgSom"><span class="interruptor"></span></label>
+      <label class="tog"><div>📳 Vibração<small>Vibrar ao bater e coletar (celular)</small></div>
+        <input type="checkbox" id="cfgVib"><span class="interruptor"></span></label>
+      <label class="tog"><div>✨ Efeitos visuais<small>Poeira, fumaça e partículas</small></div>
+        <input type="checkbox" id="cfgFx"><span class="interruptor"></span></label>
+      <button class="btn verm" id="btnReset" style="width:100%;margin-top:6px">🗑️ Apagar progresso</button>
+      <p style="text-align:center;color:var(--texto2);font-size:.75rem;margin-top:14px">
+        Teclado: <b>→ / D</b> acelera • <b>← / A</b> freia / ré • <b>P</b> pausa
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== Pausa ===================== -->
+<div id="telaPausa" class="tela escura oculto">
+  <div class="painel" style="width:min(340px,92vw)">
+    <div class="painel-topo"><h2>⏸️ Pausado</h2></div>
+    <div class="painel-corpo" style="display:flex;flex-direction:column;gap:10px">
+      <button class="btn verde" data-acao="continuar">▶ Continuar</button>
+      <button class="btn azul" data-acao="recomecar">🔄 Recomeçar</button>
+      <button class="btn cinza" data-acao="menu">🏠 Menu principal</button>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== Fim de corrida ===================== -->
+<div id="telaFim" class="tela escura oculto">
+  <div class="fim-titulo" id="fimTitulo">Capotou!</div>
+  <div class="fim-sub" id="fimSub"></div>
+  <div class="selo-recorde oculto" id="fimRecorde">⭐ NOVO RECORDE! ⭐</div>
+  <div class="fim-stats">
+    <div class="fim-linha"><span>📏 Distância</span><b id="fimDist">0 m</b></div>
+    <div class="fim-linha"><span>🪙 Moedas coletadas</span><b id="fimMoedas">0</b></div>
+    <div class="fim-linha"><span>🎯 Pontuação</span><b id="fimPontos">0</b></div>
+    <div class="fim-linha"><span>⭐ Experiência</span><b id="fimXP">+0 XP</b></div>
+  </div>
+  <div class="menu-linha">
+    <button class="btn laranja grande" data-acao="recomecar">🔄 Jogar de novo</button>
+    <button class="btn cinza" data-acao="menu">🏠 Menu</button>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
 <script>
-  let tasks = JSON.parse(localStorage.getItem('mlx-tasks') || '[]');
-  let nextId = parseInt(localStorage.getItem('mlx-nextid') || '1');
-  let view = 'list';
-
-  function save() {
-    localStorage.setItem('mlx-tasks', JSON.stringify(tasks));
-    localStorage.setItem('mlx-nextid', nextId);
-  }
-
-  function setView(v) {
-    view = v;
-    document.getElementById('btn-list').classList.toggle('active', v === 'list');
-    document.getElementById('btn-timeline').classList.toggle('active', v === 'timeline');
-    document.getElementById('task-list').style.display = v === 'list' ? 'block' : 'none';
-    document.getElementById('timeline-view').style.display = v === 'timeline' ? 'block' : 'none';
-    render();
-  }
-
-  function addTask() {
-    const text = document.getElementById('input-task').value.trim();
-    if (!text) return;
-    const time = document.getElementById('input-time').value;
-    const tag = document.getElementById('input-tag').value;
-    tasks.push({ id: nextId++, text, time, tag, done: false });
-    tasks.sort((a, b) => (a.time || '99:99').localeCompare(b.time || '99:99'));
-    document.getElementById('input-task').value = '';
-    save();
-    render();
-  }
-
-  function toggleTask(id) {
-    const t = tasks.find(t => t.id === id);
-    if (t) { t.done = !t.done; save(); render(); }
-  }
-
-  function deleteTask(id) {
-    tasks = tasks.filter(t => t.id !== id);
-    save();
-    render();
-  }
-
-  function render() {
-    updateStats();
-    if (view === 'list') renderList();
-    else renderTimeline();
-  }
-
-  function updateStats() {
-    const total = tasks.length;
-    const done = tasks.filter(t => t.done).length;
-    const pct = total ? Math.round(done / total * 100) : 0;
-    document.getElementById('stat-total').textContent = total;
-    document.getElementById('stat-done').textContent = done;
-    document.getElementById('stat-pct').textContent = pct + '%';
-    document.getElementById('pct-label').textContent = pct + '%';
-    document.getElementById('prog-fill').style.width = pct + '%';
-  }
-
-  function renderList() {
-    const list = document.getElementById('task-list');
-    if (tasks.length === 0) {
-      list.innerHTML = '<div class="empty"><span>◎</span>nenhuma tarefa ainda.<br>adicione algo acima.</div>';
-      return;
-    }
-    list.innerHTML = tasks.map(t => `
-      <div class="task-item${t.done ? ' done' : ''}" onclick="toggleTask(${t.id})">
-        <div class="check-circle">${t.done ? '✓' : ''}</div>
-        ${t.time ? `<div class="task-time">${t.time}</div>` : ''}
-        <div class="task-text">${escape(t.text)}</div>
-        <span class="task-tag tag-${t.tag}">${t.tag}</span>
-        <button class="del-btn" onclick="event.stopPropagation();deleteTask(${t.id})" title="remover">×</button>
-      </div>
-    `).join('');
-  }
-
-  function renderTimeline() {
-    const tl = document.getElementById('timeline-view');
-    if (tasks.length === 0) {
-      tl.innerHTML = '<div class="empty"><span>◎</span>nenhuma tarefa ainda.</div>';
-      return;
-    }
-    const withTime = tasks.filter(t => t.time);
-    const noTime = tasks.filter(t => !t.time);
-    let html = '';
-
-    withTime.forEach((t, i) => {
-      const isLast = i === withTime.length - 1 && noTime.length === 0;
-      html += `
-        <div class="timeline-item">
-          <div class="tl-time">${t.time}</div>
-          <div class="tl-line">
-            <div class="tl-dot ${t.done ? 'done-task' : 'has-task'}"></div>
-            ${!isLast ? '<div class="tl-connector"></div>' : ''}
-          </div>
-          <div class="tl-card${t.done ? ' done' : ''}" onclick="toggleTask(${t.id})">
-            <div class="tl-title">${escape(t.text)}</div>
-            <div class="tl-tag">${t.tag}</div>
-          </div>
-        </div>
-      `;
-    });
-
-    if (noTime.length > 0) {
-      html += `
-        <div style="font-size:11px;font-family:var(--mono);color:var(--text3);letter-spacing:0.1em;text-transform:uppercase;margin:16px 0 10px 58px;">sem horário</div>
-      `;
-      noTime.forEach(t => {
-        html += `
-          <div class="timeline-item">
-            <div class="tl-time">—</div>
-            <div class="tl-line">
-              <div class="tl-dot ${t.done ? 'done-task' : ''}"></div>
-            </div>
-            <div class="tl-card${t.done ? ' done' : ''}" onclick="toggleTask(${t.id})">
-              <div class="tl-title">${escape(t.text)}</div>
-              <div class="tl-tag">${t.tag}</div>
-            </div>
-          </div>
-        `;
-      });
-    }
-
-    tl.innerHTML = html;
-  }
-
-  function escape(s) {
-    return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-  }
-
-  // Set header date
-  const now = new Date();
-  document.getElementById('hdr-day').textContent = String(now.getDate()).padStart(2,'0');
-  document.getElementById('hdr-month').textContent = now.toLocaleDateString('pt-BR', { weekday: 'long', month: 'long', year: 'numeric' });
-
-  render();
-
-  document.getElementById('input-task').addEventListener('keydown', e => {
-    if (e.key === 'Enter') addTask();
-  });
+'use strict';
+/* ============================================================
+   VINÍCIUS GAMEPLAY – Joguinho Online
+   Jogo 2D de subida de montanha em HTML5 Canvas + JS puro.
+   Sem bibliotecas. Sem frameworks. Feito para rodar a 60 FPS.
+   ============================================================ */
 </script>
 </body>
 </html>
