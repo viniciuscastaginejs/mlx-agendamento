@@ -73,6 +73,20 @@ button{font-family:inherit;cursor:pointer;border:0;color:inherit;background:none
   padding:6px 12px;border-radius:999px;backdrop-filter:blur(4px);white-space:nowrap;
 }
 .chip b{color:#ffd66b}
+/* ---------- Doação ---------- */
+.doar-chave,.doar-codigo,.doar-resgate{background:var(--painel2);border:1px solid var(--borda);border-radius:14px;padding:12px;margin-bottom:12px}
+.doar-chave small,.doar-codigo small{display:block;color:var(--texto2);font-size:.72rem;margin-bottom:6px}
+.doar-chave-linha{display:flex;align-items:center;justify-content:space-between;gap:10px}
+.doar-chave-linha b{font-size:1.15rem;letter-spacing:.5px;color:#32bcad}
+.doar-valores{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:14px}
+.doar-val{flex:1 0 auto;min-width:62px;padding:11px 8px;border-radius:12px;font-weight:800;font-size:.9rem;color:#fff;
+  background:rgba(255,255,255,.06);border:2px solid var(--borda)}
+.doar-val.sel{border-color:#32bcad;background:rgba(50,188,173,.18);color:#7ff0e2}
+#pixCodigo{width:100%;background:rgba(0,0,0,.3);border:1px solid var(--borda);border-radius:10px;color:var(--texto2);
+  font-family:"Courier New",monospace;font-size:.7rem;padding:8px;resize:none;margin-bottom:8px;word-break:break-all}
+.doar-resgate-linha{display:flex;gap:8px;margin-top:8px}
+.doar-resgate-linha input{flex:1;background:rgba(0,0,0,.25);border:1px solid var(--borda);border-radius:12px;
+  color:#fff;font-size:1rem;font-weight:800;padding:10px 12px;text-align:center}
 .chip.speedo{font-family:"Courier New",ui-monospace,monospace;font-weight:900;color:#7ee0ff;letter-spacing:1px;text-shadow:0 0 6px rgba(120,224,255,.45);min-width:62px;justify-content:center}
 .chip.speedo small{font-size:.6rem;color:var(--texto2);margin-left:3px;letter-spacing:0;font-weight:700}
 .chip.perigo{background:rgba(216,55,46,.85);border-color:#ff8a80;animation:piscar .5s steps(2) infinite}
@@ -359,6 +373,7 @@ button{font-family:inherit;cursor:pointer;border:0;color:inherit;background:none
       <button class="btn roxo" data-acao="conq">🏆 Conquistas</button>
       <button class="btn cinza" data-acao="config">⚙️ Configurações</button>
     </div>
+    <button class="btn verde" data-acao="doar">💝 Apoiar o jogo (Pix)</button>
   </div>
   <div class="menu-rodape">
     <span class="chip">🪙 <b id="menuMoedas">0</b></span>
@@ -420,6 +435,52 @@ button{font-family:inherit;cursor:pointer;border:0;color:inherit;background:none
       <button class="btn verm" id="btnReset" style="width:100%;margin-top:6px">🗑️ Apagar progresso</button>
       <p style="text-align:center;color:var(--texto2);font-size:.75rem;margin-top:14px">
         Teclado: <b>→/D</b> acelera • <b>←/A</b> ré • <b>↑/W</b> e <b>↓/S</b> inclinam • <b>Espaço</b> nitro • <b>P</b> pausa
+      </p>
+    </div>
+  </div>
+</div>
+
+<!-- ===================== Doação (Pix) ===================== -->
+<div id="telaDoar" class="tela escura oculto">
+  <div class="painel">
+    <div class="painel-topo">
+      <h2>💝 Apoiar o jogo</h2>
+      <button class="fechar" data-fechar="telaDoar">✕</button>
+    </div>
+    <div class="painel-corpo">
+      <p style="color:var(--texto2);font-size:.85rem;margin-bottom:12px;text-align:center">
+        Doe via <b style="color:#32bcad">Pix</b> e ganhe <b style="color:#ffd66b">1.000 moedas por R$1</b>.<br>
+        Ex.: R$50 = 50.000 moedas 🪙
+      </p>
+
+      <div class="doar-chave">
+        <small>Chave Pix (celular)</small>
+        <div class="doar-chave-linha">
+          <b id="pixChave">16 99224-9536</b>
+          <button class="btn azul mini" id="btnCopiarChave">Copiar chave</button>
+        </div>
+      </div>
+
+      <p style="font-weight:800;font-size:.9rem;margin:14px 2px 8px">Escolha um valor</p>
+      <div class="doar-valores" id="doarValores"></div>
+
+      <div class="doar-codigo">
+        <small>Pix Copia e Cola (valor selecionado)</small>
+        <textarea id="pixCodigo" readonly rows="3"></textarea>
+        <button class="btn verde" id="btnCopiarPix" style="width:100%">📋 Copiar código Pix</button>
+      </div>
+
+      <div class="doar-resgate">
+        <p style="font-weight:800;font-size:.9rem;margin:0 0 6px">Depois de pagar, resgate suas moedas</p>
+        <small style="color:var(--texto2)">Digite o valor que você doou (R$) e toque em resgatar.</small>
+        <div class="doar-resgate-linha">
+          <input type="number" id="doarResgateVal" min="1" step="1" placeholder="Ex.: 50" inputmode="numeric">
+          <button class="btn laranja" id="btnResgatar">🪙 Resgatar</button>
+        </div>
+      </div>
+
+      <p style="color:var(--texto2);font-size:.72rem;margin-top:12px;text-align:center;line-height:1.4">
+        Obrigado pelo apoio! 💛 As moedas são creditadas na confiança neste aparelho.
       </p>
     </div>
   </div>
@@ -1545,9 +1606,67 @@ function toast(ico,titulo,sub){
 }
 
 /* ----------------------------------------------------------------
+   18b. DOAÇÃO (Pix copia-e-cola + crédito de moedas na confiança)
+   ---------------------------------------------------------------- */
+const PIX_CHAVE = '+5516992249536';     // chave Pix (celular) do criador
+const MOEDAS_POR_REAL = 1000;
+let doarValor = 25;                     // valor selecionado
+
+function pixCrc16(str){
+  let c=0xFFFF;
+  for(let i=0;i<str.length;i++){ c^=str.charCodeAt(i)<<8;
+    for(let j=0;j<8;j++){ c=(c&0x8000)?((c<<1)^0x1021):(c<<1); c&=0xFFFF; } }
+  return c.toString(16).toUpperCase().padStart(4,'0');
+}
+function pixTLV(id,v){ return id + String(v.length).padStart(2,'0') + v; }
+function gerarPix(valor){
+  const mai = pixTLV('26', pixTLV('00','br.gov.bcb.pix')+pixTLV('01',PIX_CHAVE));
+  let p = pixTLV('00','01');
+  if(valor>0) p += pixTLV('01','12');
+  p += mai + pixTLV('52','0000') + pixTLV('53','986');
+  if(valor>0) p += pixTLV('54', Number(valor).toFixed(2));
+  p += pixTLV('58','BR') + pixTLV('59','VINICIUS GP') + pixTLV('60','RIBEIRAO PRETO') + pixTLV('62', pixTLV('05','VGAME'));
+  p += '6304' + pixCrc16(p+'6304');
+  return p;
+}
+function copiarTexto(txt){
+  try{
+    if(navigator.clipboard && navigator.clipboard.writeText){ navigator.clipboard.writeText(txt); return true; }
+  }catch(e){}
+  try{ // fallback
+    const ta=document.createElement('textarea'); ta.value=txt; ta.style.position='fixed'; ta.style.opacity='0';
+    document.body.appendChild(ta); ta.select(); document.execCommand('copy'); document.body.removeChild(ta); return true;
+  }catch(e){ return false; }
+}
+function abrirDoar(){
+  const cont=$('#doarValores'); cont.innerHTML='';
+  const valores=[10,25,50,100];
+  for(const v of valores){
+    const b=document.createElement('button');
+    b.className='doar-val'+(v===doarValor?' sel':'');
+    b.innerHTML='R$'+v+'<br><small style="color:#ffd66b;font-weight:700">'+fmt(v*MOEDAS_POR_REAL)+'🪙</small>';
+    b.onclick=()=>{ doarValor=v; $('#doarResgateVal').value=v; abrirDoar(); Som.ui(); };
+    cont.appendChild(b);
+  }
+  $('#pixCodigo').value = gerarPix(doarValor);
+  if(!$('#doarResgateVal').value) $('#doarResgateVal').value = doarValor;
+  mostrarTela('telaDoar');
+}
+$('#btnCopiarChave').onclick=()=>{ if(copiarTexto('16992249536')){ Som.ui(); toast('📋','Chave copiada!','Cole no seu banco'); } };
+$('#btnCopiarPix').onclick=()=>{ if(copiarTexto($('#pixCodigo').value)){ Som.ui(); toast('📋','Código Pix copiado!','Cole em "Pix Copia e Cola"'); } };
+$('#btnResgatar').onclick=()=>{
+  const v=Math.floor(Number($('#doarResgateVal').value)||0);
+  if(v<1){ toast('⚠️','Digite o valor','Em reais (R$)'); return; }
+  const ganho=v*MOEDAS_POR_REAL;
+  S.moedas+=ganho; S.doouTotal=(S.doouTotal||0)+v;
+  Som.moeda(); salvar(); atualizarMenu();
+  toast('💝','Obrigado pelo apoio!','+'+fmt(ganho)+' 🪙');
+};
+
+/* ----------------------------------------------------------------
    18. NAVEGAÇÃO DE TELAS
    ---------------------------------------------------------------- */
-const TELAS=['telaMenu','telaLoja','telaConq','telaConfig','telaPausa','telaFim'];
+const TELAS=['telaMenu','telaLoja','telaConq','telaConfig','telaDoar','telaPausa','telaFim'];
 function mostrarTela(id){
   for(const t of TELAS) $('#'+t).classList.add('oculto');
   if(id) $('#'+id).classList.remove('oculto');
@@ -1912,6 +2031,7 @@ document.body.addEventListener('click',e=>{
       case 'loja': abrirLoja(); break;
       case 'conq': abrirConq(); break;
       case 'config': abrirConfig(); break;
+      case 'doar': abrirDoar(); break;
       case 'continuar': alternarPausa(); break;
       case 'recomecar': iniciarPartida(); break;
       case 'menu': voltarMenu(); break;
