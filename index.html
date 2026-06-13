@@ -123,8 +123,8 @@ button{font-family:inherit;cursor:pointer;border:0;color:inherit;background:none
 /* ---------- Abas da loja ---------- */
 .abas{display:flex;gap:6px;padding:10px 14px 0}
 .aba{
-  flex:1;padding:10px 6px;border-radius:12px 12px 0 0;font-weight:800;font-size:.85rem;color:var(--texto2);
-  background:rgba(255,255,255,.04);border:1px solid transparent;border-bottom:0;
+  flex:1;padding:10px 3px;border-radius:12px 12px 0 0;font-weight:800;font-size:.76rem;color:var(--texto2);
+  background:rgba(255,255,255,.04);border:1px solid transparent;border-bottom:0;white-space:nowrap;
 }
 .aba.ativa{color:#fff;background:rgba(255,255,255,.1);border-color:var(--borda)}
 
@@ -240,6 +240,18 @@ button{font-family:inherit;cursor:pointer;border:0;color:inherit;background:none
 .pedal.freio{left:max(14px,env(safe-area-inset-left));background:linear-gradient(180deg,rgba(255,93,82,.85),rgba(165,33,26,.85));box-shadow:0 6px 0 rgba(90,12,8,.8),0 12px 22px rgba(0,0,0,.45)}
 .pedal.gas{right:max(14px,env(safe-area-inset-right));background:linear-gradient(180deg,rgba(86,214,118,.85),rgba(20,128,58,.85));box-shadow:0 6px 0 rgba(8,72,30,.8),0 12px 22px rgba(0,0,0,.45)}
 .pedal.apertado{transform:translateY(5px) scale(.97);filter:brightness(1.18);box-shadow:0 1px 0 rgba(0,0,0,.6)}
+.pedal-nitro{
+  position:absolute;bottom:max(18px,env(safe-area-inset-bottom));right:calc(max(14px,env(safe-area-inset-right)) + clamp(110px,24vw,170px) + 12px);
+  width:clamp(66px,14vw,90px);height:clamp(82px,16vw,116px);border-radius:20px;
+  font-weight:900;font-size:clamp(.7rem,2vw,.9rem);line-height:1.05;color:#fff;pointer-events:auto;text-align:center;
+  border:2px solid rgba(255,255,255,.3);
+  background:linear-gradient(180deg,rgba(255,170,60,.9),rgba(214,90,12,.9));
+  box-shadow:0 6px 0 rgba(120,45,5,.8),0 12px 22px rgba(0,0,0,.45);
+}
+.pedal-nitro.apertado{transform:translateY(5px) scale(.97);filter:brightness(1.2);box-shadow:0 1px 0 rgba(0,0,0,.6)}
+.pedal-nitro:disabled{filter:grayscale(.7) brightness(.7)}
+.nitro-trilho{display:inline-block;width:56px;height:9px;border-radius:5px;background:rgba(255,255,255,.18);overflow:hidden;vertical-align:middle}
+.nitro-trilho b{display:block;height:100%;width:100%;background:linear-gradient(90deg,#ffd23e,#ff7a1a);border-radius:5px}
 
 /* ---------- Fim de corrida ---------- */
 .fim-titulo{font-size:clamp(1.7rem,7vw,2.6rem);font-weight:900;font-style:italic;text-transform:uppercase;
@@ -304,6 +316,7 @@ button{font-family:inherit;cursor:pointer;border:0;color:inherit;background:none
     <span class="chip" id="hudNivel">⭐ Nível 1</span>
     <span class="chip" id="hudRec">🏆 0 m</span>
     <span class="chip" id="hudAlien">👾 —</span>
+    <span class="chip oculto" id="hudNitroWrap">🔥 <span class="nitro-trilho"><b id="hudNitro"></b></span></span>
   </div>
   <div id="avisoJogo" class="aviso-jogo oculto"></div>
 </div>
@@ -311,6 +324,7 @@ button{font-family:inherit;cursor:pointer;border:0;color:inherit;background:none
 <!-- ===================== Pedais (touch / clique) ===================== -->
 <div id="touch" class="oculto">
   <button class="pedal freio" id="btnFreio">◀ FREIO</button>
+  <button class="pedal-nitro oculto" id="btnNitro">🔥<br>NITRO</button>
   <button class="pedal gas" id="btnGas">GÁS ▶</button>
 </div>
 
@@ -346,7 +360,8 @@ button{font-family:inherit;cursor:pointer;border:0;color:inherit;background:none
     </div>
     <div class="abas">
       <button class="aba ativa" data-aba="melhorias">🔧 Melhorias</button>
-      <button class="aba" data-aba="veiculos">🚗 Veículos</button>
+      <button class="aba" data-aba="tracao">⚙️ Tração</button>
+      <button class="aba" data-aba="veiculos">🚗 Carros</button>
       <button class="aba" data-aba="mapas">🗺️ Mapas</button>
     </div>
     <div class="painel-corpo" id="lojaCorpo"></div>
@@ -444,6 +459,7 @@ const UPGRADES = {
   pneus:     {nome:'Pneus',     ico:'🛞', desc:'Mais aderência, menos derrapada', base:100, mult:1.7},
   suspensao: {nome:'Suspensão', ico:'🪛', desc:'Absorve melhor os impactos',      base:110, mult:1.7},
   tanque:    {nome:'Tanque',    ico:'⛽', desc:'Mais combustível por corrida',     base:130, mult:1.7},
+  nitro:     {nome:'Nitro',     ico:'🔥', desc:'Impulso turbo (botão na tela)',    base:160, mult:1.8},
 };
 const MAX_NIVEL_UP = 5;
 // Custo de um upgrade no nível atual.
@@ -513,7 +529,9 @@ const estadoPadrao = () => ({
   totMoedas:0, totDist:0,            // acumulados para conquistas
   veiculoSel:'basico', mapaSel:'floresta',
   veiculos:['basico'], mapas:['floresta'],
-  up:{motor:0,pneus:0,suspensao:0,tanque:0},
+  up:{motor:0,pneus:0,suspensao:0,tanque:0,nitro:0},
+  tracao:'traseira', tracoes:['traseira'],   // tração atual e desbloqueadas
+  coresCarro:{},                              // cor customizada por veículo (id -> hex)
   conquistas:[],
   cfg:{som:true, vib:true, fx:true},
 });
@@ -523,9 +541,13 @@ function carregar(){
   try{
     const dados = JSON.parse(localStorage.getItem(SAVE_KEY));
     if(!dados) return estadoPadrao();
-    return Object.assign(estadoPadrao(), dados,
-      {up:Object.assign(estadoPadrao().up, dados.up||{}),
-       cfg:Object.assign(estadoPadrao().cfg, dados.cfg||{})});
+    const p=estadoPadrao();
+    return Object.assign(p, dados,
+      {up:Object.assign(p.up, dados.up||{}),
+       cfg:Object.assign(p.cfg, dados.cfg||{}),
+       coresCarro:Object.assign({}, dados.coresCarro||{}),
+       tracoes: dados.tracoes || ['traseira'],
+       tracao: dados.tracao || 'traseira'});
   }catch(e){ return estadoPadrao(); }
 }
 function salvar(){ try{ localStorage.setItem(SAVE_KEY, JSON.stringify(S)); }catch(e){} }
@@ -658,6 +680,7 @@ const Carro = {
     const v = VEICULOS.find(o=>o.id===S.veiculoSel) || VEICULOS[0];
     // aplica upgrades (cada nível soma ~12% no atributo correspondente)
     const k = lv => 1 + lv*0.12;
+    const cor = (S.coresCarro && S.coresCarro[v.id]) || v.cor;
     this.spec = {
       ref:v,
       power: v.power * k(S.up.motor) * 640,
@@ -665,12 +688,14 @@ const Carro = {
       peso:  v.peso,
       susp:  v.susp  * (1 + S.up.suspensao*0.10),
       tanque: v.tanque * (1 + S.up.tanque*0.16),
-      roda:  v.roda, larg:v.larg, alt:v.alt, cor:v.cor, teto:v.teto, tipo:v.tipo,
+      nitroForca: 1 + S.up.nitro*0.45,            // potência do nitro
+      nitroMax:   1 + S.up.nitro*0.35,            // tamanho do tanque de nitro
+      roda:  v.roda, larg:v.larg, alt:v.alt, cor:cor, teto:v.teto, tipo:v.tipo,
     };
     const baseX = this.spec.larg*0.46;          // entre-eixos largo (rodas bem afastadas)
-    const baseY = this.spec.alt*0.92;           // rodas bem abaixo do chassi
+    const baseY = this.spec.alt*0.88;           // alinhado ao desenho do carro
     this.rodas = [
-      {dx:-baseX, dy:baseY, comp:0, rot:0},     // traseira (tração)
+      {dx:-baseX, dy:baseY, comp:0, rot:0},     // traseira
       {dx: baseX, dy:baseY, comp:0, rot:0},     // dianteira
     ];
     this._restY = baseY + this.spec.roda;       // altura de repouso (roda no chão)
@@ -679,14 +704,16 @@ const Carro = {
     this.y = Terreno.altura(this.x) - this._restY - 2;
     this.vx=0; this.vy=0; this.ang=0; this.vAng=0;
     this.combustivel = 1;
+    this.nitro = (S.up.nitro>0) ? 1 : 0;        // tanque de nitro (0..1)
+    this.nitroAtivo = 0;                        // tempo restante de boost
     this.vivo=true; this.motivo='';
     this.noChao=false;
   },
 
   // consumo proporcional ao tanque (tanques maiores = mais "fôlego")
-  consumo(gas){ return (0.000085 + gas*0.00010) / this.spec.tanque; },
+  consumo(gas){ return (0.00013 + gas*0.00014) / this.spec.tanque; },
 
-  atualizar(dt, gas, freio){
+  atualizar(dt, gas, freio, nitroBtn){
     if(!this.vivo) return;
     const G = 2400;                  // gravidade (px/s²)
     const sp = this.spec;
@@ -698,49 +725,59 @@ const Carro = {
     }
     const temGas = this.combustivel>0;
 
+    // ---- nitro ----
+    if(nitroBtn && this.nitro>0.02 && temGas){
+      this.nitroAtivo = 0.12;                 // mantém aceso enquanto segura
+      this.nitro = clamp(this.nitro - 0.55*dt, 0, 1);
+    } else {
+      this.nitroAtivo = Math.max(0, this.nitroAtivo - dt);
+      // recarrega devagar quando não usa (mais rápido com upgrade)
+      this.nitro = clamp(this.nitro + (0.04 + S.up.nitro*0.012)*dt, 0, 1);
+    }
+    const boost = this.nitroAtivo>0 ? sp.nitroForca : 1;   // multiplicador de força
+
+    // quais rodas tracionam, conforme a tração escolhida
+    const tracaoTras = S.tracao !== 'dianteira';   // traseira ou 4x4
+    const tracaoDian = S.tracao !== 'traseira';    // dianteira ou 4x4
+    const nDrive = (tracaoTras?1:0) + (tracaoDian?1:0);
+    const fatorRoda = nDrive>1 ? 0.60 : 1.0;       // divide a força no 4x4
+
     // gravidade
     this.vy += G*dt;
 
     // ---- rodas: suspensão (baseada em posição) + tração ----
-    // Resolvemos a penetração no solo movendo o corpo para fora dele.
-    // Isso garante que o carro SEMPRE encosta no chão e nunca atravessa,
-    // então a roda traseira sempre consegue tração.
     let qtdNoChao=0;
     const cos=Math.cos(this.ang), sin=Math.sin(this.ang);
     const curso = 26;                             // curso visual da suspensão
     for(let i=0;i<this.rodas.length;i++){
       const r=this.rodas[i];
-      // posição mundial do ponto de fixação da roda
       const ax = this.x + r.dx*cos - r.dy*sin;
       const ay = this.y + r.dx*sin + r.dy*cos;
       const solo = Terreno.altura(ax);
       const penetra = (ay + sp.roda) - solo;      // > 0 = roda dentro do chão
       if(penetra > 0){
         qtdNoChao++;
-        r.comp = clamp(penetra/curso, 0, 1);      // compressão p/ animação
+        r.comp = clamp(penetra/curso, 0, 1);
         const inc = Terreno.inclinacao(ax);
-        // correção de posição: empurra o corpo para cima (cada roda resolve parte)
         this.y -= penetra * 0.6 / sp.peso;
-        // amortecimento vertical (sensação de mola)
         if(this.vy > 0) this.vy *= (1 - 0.55*sp.susp);
-        // alinha o chassi à inclinação da rampa
         let dAng = inc - this.ang;
         while(dAng> Math.PI) dAng-=Math.PI*2;
         while(dAng<-Math.PI) dAng+=Math.PI*2;
         this.vAng += dAng * 6.0 * dt;
-        // ---- tração 4x4: AS DUAS rodas puxam (sobe morro muito melhor) ----
-        if(temGas){
-          const dir = (gas - freio);                          // +1 acelera, -1 freia/ré
-          const acel = dir * sp.power / sp.peso * dt * 0.60;   // força dividida entre as 2 rodas
+        // ---- tração: aplica na(s) roda(s) certa(s) ----
+        const estaRoda = (i===0 && tracaoTras) || (i===1 && tracaoDian);
+        if(temGas && estaRoda){
+          const dir = (gas - freio);
+          const acel = dir * sp.power / sp.peso * dt * fatorRoda * boost;
           this.vx += Math.cos(inc) * acel;
           this.vy += Math.sin(inc) * acel;
-          // 4x4 é plantado: traseira tende a empinar, dianteira segura a frente
+          // traseira tende a empinar; dianteira "puxa" e abaixa o nariz
           this.vAng -= dir * (i===0 ? 0.30 : -0.18) * dt;
         }
       } else {
         r.comp = lerp(r.comp, 0, clamp(dt*8,0,1));
       }
-      // rotação visual da roda conforme velocidade horizontal
       r.rot += (this.vx/ sp.roda) * dt;
     }
     this.noChao = qtdNoChao>0;
@@ -862,9 +899,9 @@ const Cam = {x:0,y:0, escala:1,
    ---------------------------------------------------------------- */
 const Perseguidor = {
   x:0, ativo:false, fase:0,
-  iniciar(){ this.ativo=true; this.x = Carro.x - 780; this.fase=0; },
-  // velocidade sobe com a distância — obriga a melhorar o carro p/ ir mais longe
-  velocidade(){ return 135 + Math.min(250, Jogo.maxDistM*0.22); },
+  iniciar(){ this.ativo=true; this.x = Carro.x - 880; this.fase=0; },
+  // velocidade sobe mais agressivamente com a distância
+  velocidade(){ return 155 + Math.min(360, Jogo.maxDistM*0.30); },
   distancia(){ return Carro.x - this.x; },        // folga em px (mundo)
   atualizar(dt){
     if(!this.ativo) return;
@@ -1016,78 +1053,123 @@ function desenharEnfeite(tipo,m,extra){
 /* ----------------------------------------------------------------
    12. DESENHO DO CARRO
    ---------------------------------------------------------------- */
+// ---- helpers de cor (aceitam #rrggbb) ----
+function hexAjuste(hex,f){            // f>0 clareia, f<0 escurece
+  hex=hex.replace('#',''); if(hex.length===3) hex=hex.split('').map(c=>c+c).join('');
+  let r=parseInt(hex.substr(0,2),16),g=parseInt(hex.substr(2,2),16),b=parseInt(hex.substr(4,2),16);
+  if(f>=0){ r+=(255-r)*f; g+=(255-g)*f; b+=(255-b)*f; } else { r*=(1+f); g*=(1+f); b*=(1+f); }
+  const h=v=>('0'+Math.round(clamp(v,0,255)).toString(16)).slice(-2);
+  return '#'+h(r)+h(g)+h(b);
+}
+// retângulo arredondado em qualquer contexto
+function rrectG(g,x,y,w,h,r){
+  g.beginPath();
+  g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r);
+  g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath();
+}
+// retângulo arredondado no contexto principal (usado nos coletáveis)
+function arred(x,y,w,h,r){ rrectG(ctx,x,y,w,h,r); }
+
+// paralama (semicírculo para cima) ligando os pontos da base
+function archTo(g,cx,yb,ar,n){ n=n||10;
+  for(let k=0;k<=n;k++){ const a=Math.PI - Math.PI*k/n; g.lineTo(cx+ar*Math.cos(a), yb-ar*Math.sin(a)); }
+}
+// pontos do "greenhouse" (cabine) por tipo de veículo
+function greenhouse(tipo,L,A){
+  switch(tipo){
+    case 'jeep':    return [[L/2,-A*0.1],[L*0.40,-A*0.2],[L*0.34,-A*1.25],[0,-A*1.32],[-L*0.34,-A*1.28],[-L*0.42,-A*0.5],[-L/2,-A*0.1]];
+    case 'sport':   return [[L/2,0],[L*0.34,-A*0.22],[L*0.12,-A*0.78],[-L*0.05,-A*0.82],[-L*0.34,-A*0.5],[-L*0.46,-A*0.15],[-L/2,0]];
+    case 'pickup':  return [[L/2,-A*0.05],[L*0.40,-A*0.12],[L*0.34,-A*1.05],[0,-A*1.12],[-L*0.06,-A*0.55],[-L*0.5,-A*0.42],[-L/2,-A*0.05]];
+    case 'special': return [[L/2,-A*0.05],[L*0.36,-A*0.15],[L*0.28,-A*1.05],[0,-A*1.18],[-L*0.26,-A*1.15],[-L*0.42,-A*0.5],[-L/2,-A*0.05]];
+    default:        return [[L/2,-A*0.05],[L*0.36,-A*0.12],[L*0.30,-A*0.98],[L*0.02,-A*1.12],[-L*0.20,-A*1.12],[-L*0.40,-A*0.5],[-L/2,-A*0.05]];
+  }
+}
+function janelas(tipo,L,A){
+  switch(tipo){
+    case 'jeep':    return [[L*0.30,-A*1.16],[0,-A*1.22],[-L*0.30,-A*1.18],[-L*0.34,-A*0.55],[L*0.30,-A*0.55]];
+    case 'sport':   return [[L*0.12,-A*0.72],[-L*0.04,-A*0.74],[-L*0.28,-A*0.5],[L*0.16,-A*0.5]];
+    case 'pickup':  return [[L*0.30,-A*0.98],[L*0.02,-A*1.04],[-L*0.02,-A*0.55],[L*0.26,-A*0.55]];
+    case 'special': return [[L*0.26,-A*1.0],[0,-A*1.1],[-L*0.22,-A*1.06],[-L*0.30,-A*0.55],[L*0.22,-A*0.55]];
+    default:        return [[L*0.30,-A*0.92],[L*0.04,-A*1.02],[-L*0.18,-A*1.02],[-L*0.33,-A*0.55],[L*0.24,-A*0.55]];
+  }
+}
+
+// Desenha a forma do carro em coords locais (centro 0,0). g = contexto.
+// rodas = [{dx,dy,comp,rot}]
+function desenharFormaCarro(g, sp, rodas){
+  const L=sp.larg, A=sp.alt, R=sp.roda;
+  const baseX=L*0.46, yb=A*0.88, ar=R+2;
+  const escura=hexAjuste(sp.cor,-0.24), clara=hexAjuste(sp.cor,0.35);
+  g.lineJoin='round';
+  // rodas (com vão escuro) — desenhadas primeiro; aparecem pelos paralamas
+  for(const r of rodas){
+    const wy = yb + (r.comp||0)*5;
+    g.fillStyle='#15181e'; g.beginPath(); g.arc(r.dx,wy,R+2,0,7); g.fill();
+    desenharRoda(g, r.dx, wy, R, r.rot||0);
+  }
+  // corpo + paralamas
+  g.beginPath();
+  g.moveTo(-L/2, yb);
+  g.lineTo(-baseX-ar, yb); archTo(g,-baseX,yb,ar);
+  g.lineTo( baseX-ar, yb); archTo(g, baseX,yb,ar);
+  g.lineTo(L/2, yb);
+  for(const [x,y] of greenhouse(sp.tipo,L,A)) g.lineTo(x,y);
+  g.closePath();
+  g.fillStyle=sp.cor; g.fill();
+  // faixa inferior escura (volume)
+  g.fillStyle=escura; g.fillRect(-L/2, yb-4, L, 4);
+  // turbina do especial
+  if(sp.tipo==='special'){ g.fillStyle='#ff5ddb'; rrectG(g,-L*0.55,-A*0.45,7,A*0.8,3); g.fill(); }
+  // vidros
+  const win=janelas(sp.tipo,L,A);
+  g.beginPath(); g.moveTo(win[0][0],win[0][1]);
+  for(let i=1;i<win.length;i++) g.lineTo(win[i][0],win[i][1]);
+  g.closePath(); g.fillStyle='rgba(150,205,240,.92)'; g.fill();
+  // coluna entre janelas (não no esportivo, p/ não virar "antena")
+  if(sp.tipo!=='sport'){ g.strokeStyle=escura; g.lineWidth=2;
+    g.beginPath(); g.moveTo(L*0.04,-A*0.55); g.lineTo(L*0.04,-A*0.98); g.stroke(); }
+  // brilho no teto
+  if(sp.tipo!=='sport'){ g.strokeStyle=clara; g.lineWidth=2;
+    g.beginPath(); g.moveTo(-L*0.16,-A*1.05); g.lineTo(L*0.0,-A*1.06); g.stroke(); }
+  // farol e lanterna
+  g.fillStyle='#ffe27a'; g.beginPath(); g.ellipse(L*0.47,A*0.06,3.6,5,0,0,7); g.fill();
+  g.fillStyle='#e6463c'; g.beginPath(); g.ellipse(-L*0.47,A*0.06,3,4.4,0,0,7); g.fill();
+  // maçaneta
+  g.strokeStyle=escura; g.lineWidth=2;
+  g.beginPath(); g.moveTo(-L*0.05,-A*0.28); g.lineTo(L*0.08,-A*0.28); g.stroke();
+}
+
 function desenharCarro(){
   const sp=Carro.spec;
   const [sx,sy]=pontoTela(Carro.x,Carro.y);
   ctx.save();
   ctx.translate(sx,sy); ctx.rotate(Carro.ang);
-
-  // sombra
+  // sombra no chão (sem rotacionar)
   ctx.save(); ctx.rotate(-Carro.ang);
   ctx.fillStyle='rgba(0,0,0,.18)';
-  ctx.beginPath(); ctx.ellipse(0,sp.alt*0.7+8,sp.larg*0.55,8,0,0,7); ctx.fill();
+  ctx.beginPath(); ctx.ellipse(0, sp.alt*1.05+6, sp.larg*0.6, 9,0,0,7); ctx.fill();
   ctx.restore();
-
-  const L=sp.larg, A=sp.alt;
-
-  // rodas (com suspensão)
-  for(const r of Carro.rodas){
-    const wx=r.dx, wy=r.dy + r.comp*10;   // comprime ~10px
-    desenharRoda(wx,wy,sp.roda,r.rot);
+  desenharFormaCarro(ctx, sp, Carro.rodas);
+  // chama do nitro quando ativo
+  if(Carro.nitroAtivo>0){
+    ctx.fillStyle='rgba(255,150,40,.9)';
+    const f=6+Math.random()*8;
+    ctx.beginPath(); ctx.moveTo(-sp.larg*0.5,-sp.alt*0.1);
+    ctx.lineTo(-sp.larg*0.5-f-10,0); ctx.lineTo(-sp.larg*0.5,sp.alt*0.2); ctx.closePath(); ctx.fill();
+    ctx.fillStyle='rgba(255,230,90,.95)';
+    ctx.beginPath(); ctx.moveTo(-sp.larg*0.5,0); ctx.lineTo(-sp.larg*0.5-f,sp.alt*0.05); ctx.lineTo(-sp.larg*0.5,sp.alt*0.12); ctx.closePath(); ctx.fill();
   }
-
-  // chassi (varia por tipo)
-  ctx.fillStyle=sp.cor;
-  desenharChassi(sp.tipo, L, A, sp);
-
   ctx.restore();
 }
-function desenharRoda(x,y,raio,rot){
-  ctx.save(); ctx.translate(x,y);
-  // pneu
-  ctx.fillStyle='#1a1a1a'; ctx.beginPath(); ctx.arc(0,0,raio,0,7); ctx.fill();
-  // aro
-  ctx.fillStyle='#cfd6df'; ctx.beginPath(); ctx.arc(0,0,raio*0.55,0,7); ctx.fill();
-  // raios girando
-  ctx.rotate(rot); ctx.strokeStyle='#8a93a0'; ctx.lineWidth=2;
-  for(let i=0;i<4;i++){ ctx.rotate(Math.PI/2);
-    ctx.beginPath(); ctx.moveTo(0,0); ctx.lineTo(raio*0.5,0); ctx.stroke(); }
-  ctx.fillStyle='#5a6675'; ctx.beginPath(); ctx.arc(0,0,3,0,7); ctx.fill();
-  ctx.restore();
-}
-function arred(x,y,w,h,r){ // retângulo arredondado
-  ctx.beginPath();
-  ctx.moveTo(x+r,y); ctx.arcTo(x+w,y,x+w,y+h,r); ctx.arcTo(x+w,y+h,x,y+h,r);
-  ctx.arcTo(x,y+h,x,y,r); ctx.arcTo(x,y,x+w,y,r); ctx.closePath();
-}
-function desenharChassi(tipo,L,A,sp){
-  const meio=L/2;
-  ctx.lineJoin='round';
-  // corpo base
-  arred(-meio,-A,L,A*2,8); ctx.fill();
-  // cabine/teto
-  ctx.fillStyle=sp.teto;
-  if(tipo==='pickup'){
-    arred(-meio+4,-A-14,L*0.42,18,6); ctx.fill();           // cabine na frente
-    ctx.fillStyle='rgba(0,0,0,.25)'; arred(meio*0.05,-A-12,L*0.40,9,4); ctx.fill(); // caçamba escura
-  }else if(tipo==='jeep'){
-    arred(-meio+8,-A-20,L*0.7,22,6); ctx.fill();
-  }else if(tipo==='sport'){
-    arred(-meio+12,-A-12,L*0.6,14,7); ctx.fill();
-  }else if(tipo==='special'){
-    arred(-meio+10,-A-18,L*0.65,20,8); ctx.fill();
-    ctx.fillStyle='#ff5ddb';                                 // turbina traseira
-    arred(-meio-6,-A*0.4,8,A*0.8,3); ctx.fill();
-  }else{ // hatch básico
-    arred(-meio+10,-A-16,L*0.62,18,7); ctx.fill();
-  }
-  // vidros
-  ctx.fillStyle='rgba(150,210,255,.85)';
-  arred(-meio+16,-A-12,L*0.22,11,3); ctx.fill();
-  arred(-meio+16+L*0.26,-A-12,L*0.2,11,3); ctx.fill();
-  // faróis
-  ctx.fillStyle='#ffe27a'; ctx.beginPath(); ctx.arc(meio-5,-2,4,0,7); ctx.fill();
-  ctx.fillStyle='#ff5d52'; ctx.beginPath(); ctx.arc(-meio+5,-2,3,0,7); ctx.fill();
+function desenharRoda(g,x,y,raio,rot){
+  g.save(); g.translate(x,y);
+  g.fillStyle='#1c1c1f'; g.beginPath(); g.arc(0,0,raio,0,7); g.fill();          // pneu
+  g.fillStyle='#cfd6df'; g.beginPath(); g.arc(0,0,raio*0.52,0,7); g.fill();      // aro
+  g.rotate(rot); g.strokeStyle='#8a93a0'; g.lineWidth=2;
+  for(let i=0;i<5;i++){ g.rotate(Math.PI*2/5);
+    g.beginPath(); g.moveTo(0,0); g.lineTo(raio*0.46,0); g.stroke(); }
+  g.fillStyle='#5a6675'; g.beginPath(); g.arc(0,0,raio*0.18,0,7); g.fill();      // cubo
+  g.restore();
 }
 
 /* ----------------------------------------------------------------
@@ -1142,7 +1224,7 @@ function checarColetaveis(){
 const Jogo = {
   estado:'menu',     // menu | jogando | pausa | fim
   tempo:0, dist:0, distM:0, maxDistM:0,
-  ctrl:{gas:false, freio:false},
+  ctrl:{gas:false, freio:false, nitro:false},
 };
 let ultimo=0, fpsAcc=0;
 
@@ -1160,6 +1242,10 @@ function iniciarPartida(){
   mostrarTela(null);
   $('#hud').classList.remove('oculto');
   $('#touch').classList.toggle('oculto', !ehTouch);
+  // nitro só aparece se foi comprado
+  const temNitro = S.up.nitro>0;
+  $('#btnNitro').classList.toggle('oculto', !(temNitro && ehTouch));
+  $('#hudNitroWrap').classList.toggle('oculto', !temNitro);
   Som.retomar(); Som.motorLigar();
   avisoJogo('Fuja dos aliens! Acelere! 👾🏁');
 }
@@ -1208,7 +1294,7 @@ function atualizar(dt){
   const gas = Jogo.ctrl.gas?1:0;
   const freio = Jogo.ctrl.freio?1:0;
 
-  Carro.atualizar(dt, gas, freio);
+  Carro.atualizar(dt, gas, freio, Jogo.ctrl.nitro);
   Perseguidor.atualizar(dt);
   Cam.seguir(dt);
 
@@ -1293,6 +1379,11 @@ function atualizarHUD(){
   fb.style.width=(f*100)+'%';
   fb.classList.toggle('baixo', f<0.35 && f>=0.15);
   fb.classList.toggle('critico', f<0.15);
+  // nitro
+  if(S.up.nitro>0){
+    $('#hudNitro').style.width=(Carro.nitro*100)+'%';
+    const bn=$('#btnNitro'); if(bn) bn.disabled = Carro.nitro<0.05;
+  }
 }
 let avisoTimer=null;
 function avisoJogo(txt){
@@ -1359,6 +1450,7 @@ function renderLoja(){
   $$('.aba').forEach(a=>a.classList.toggle('ativa', a.dataset.aba===abaLoja));
   const corpo=$('#lojaCorpo'); corpo.innerHTML='';
   if(abaLoja==='melhorias') renderMelhorias(corpo);
+  if(abaLoja==='tracao')    renderTracao(corpo);
   if(abaLoja==='veiculos')  renderVeiculos(corpo);
   if(abaLoja==='mapas')     renderMapas(corpo);
 }
@@ -1382,6 +1474,40 @@ function renderMelhorias(corpo){
     const custo=custoUpgrade(chave,nv);
     if(S.moedas<custo) return;
     S.moedas-=custo; S.up[chave]++; Som.ui(); salvar(); checarConquistas(); renderLoja(); atualizarMenu();
+  });
+}
+function renderTracao(corpo){
+  const CUSTO_TRACAO = 10000;
+  const defs=[
+    {id:'traseira', ico:'🛞', nome:'Traseira (2×1)', desc:'Padrão. Só a roda de trás puxa. Tende a empinar.'},
+    {id:'dianteira',ico:'🚙', nome:'Dianteira',      desc:'A roda da frente puxa. Mais estável, menos empina.'},
+    {id:'4x4',      ico:'⚙️', nome:'4×4 Integral',    desc:'As duas rodas puxam. Sobe morro muito melhor.'},
+  ];
+  const aviso=document.createElement('p');
+  aviso.style.cssText='color:var(--texto2);font-size:.78rem;margin:0 2px 10px';
+  aviso.textContent='Trocar a tração é caro, mas muda muito como o carro sobe os morros.';
+  corpo.appendChild(aviso);
+  for(const t of defs){
+    const tem=S.tracoes.includes(t.id);
+    const sel=S.tracao===t.id;
+    let acao;
+    if(sel)      acao=`<button class="btn verde mini" disabled>✓ Em uso</button>`;
+    else if(tem) acao=`<button class="btn azul mini" data-usatrac="${t.id}">Usar</button>`;
+    else         acao=`<button class="btn laranja mini" ${S.moedas<CUSTO_TRACAO?'disabled':''} data-comptrac="${t.id}">🪙 ${fmt(CUSTO_TRACAO)}</button>`;
+    const div=document.createElement('div'); div.className='linha-up';
+    div.innerHTML=`<div class="up-ico">${t.ico}</div>
+      <div class="up-info"><b>${t.nome}</b><small>${t.desc}</small></div>${acao}`;
+    corpo.appendChild(div);
+  }
+  corpo.querySelectorAll('[data-usatrac]').forEach(b=>b.onclick=()=>{
+    S.tracao=b.dataset.usatrac; Som.ui(); salvar(); renderLoja();
+  });
+  corpo.querySelectorAll('[data-comptrac]').forEach(b=>b.onclick=()=>{
+    if(S.moedas<CUSTO_TRACAO) return;
+    const id=b.dataset.comptrac;
+    S.moedas-=CUSTO_TRACAO; S.tracoes.push(id); S.tracao=id;
+    Som.ui(); toast('⚙️','Tração trocada!', id==='4x4'?'4×4 Integral':id);
+    salvar(); atualizarMenu(); renderLoja();
   });
 }
 function renderVeiculos(corpo){
@@ -1419,6 +1545,30 @@ function renderVeiculos(corpo){
     S.moedas-=v.custo; S.veiculos.push(v.id); S.veiculoSel=v.id;
     Som.ui(); toast('🚗','Veículo comprado!',v.nome); salvar(); checarConquistas(); renderLoja(); atualizarMenu();
   });
+
+  // ---- Paleta de cores (customização do carro selecionado) ----
+  const vSel = VEICULOS.find(o=>o.id===S.veiculoSel) || VEICULOS[0];
+  const tit=document.createElement('div');
+  tit.style.cssText='margin:14px 2px 8px;font-weight:800;font-size:.9rem';
+  tit.innerHTML='🎨 Pintura do '+vSel.nome;
+  corpo.appendChild(tit);
+  const PALETA=['#e74c3c','#e67e22','#f1c40f','#2ecc71','#16a085','#3498db','#9b59b6','#e84393','#34495e','#ecf0f1'];
+  const box=document.createElement('div');
+  box.style.cssText='display:flex;flex-wrap:wrap;gap:9px;align-items:center';
+  const corAtual=(S.coresCarro[vSel.id]||vSel.cor).toLowerCase();
+  // botão "padrão"
+  const padrao=document.createElement('button');
+  padrao.className='btn cinza mini'; padrao.textContent='Padrão';
+  padrao.onclick=()=>{ delete S.coresCarro[vSel.id]; Som.ui(); salvar(); renderLoja(); };
+  box.appendChild(padrao);
+  for(const cor of PALETA){
+    const sw=document.createElement('button');
+    const usada = corAtual===cor.toLowerCase();
+    sw.style.cssText=`width:34px;height:34px;border-radius:50%;background:${cor};border:3px solid ${usada?'#ffd23e':'rgba(255,255,255,.25)'};box-shadow:0 2px 6px rgba(0,0,0,.4)`;
+    sw.onclick=()=>{ S.coresCarro[vSel.id]=cor; Som.ui(); salvar(); renderLoja(); };
+    box.appendChild(sw);
+  }
+  corpo.appendChild(box);
 }
 function renderMapas(corpo){
   const grade=document.createElement('div'); grade.className='grade';
@@ -1452,14 +1602,13 @@ function renderMapas(corpo){
 }
 // miniatura de carro num canvas pequeno
 function desenharMiniCarro(c,v){
-  const x=c.getContext('2d'); const sp={larg:60,alt:20,roda:13,cor:v.cor,teto:v.teto,tipo:v.tipo};
-  x.clearRect(0,0,c.width,c.height); x.save(); x.translate(65,46);
-  // chão
-  x.fillStyle='rgba(255,255,255,.06)'; x.fillRect(-65,16,130,12);
-  const ctxBak=window.ctx; window.ctx=x;       // reaproveita as funções de desenho
-  for(const dx of [-22,22]) desenharRoda(dx,8,sp.roda,0);
-  x.fillStyle=sp.cor; desenharChassi(sp.tipo,sp.larg,sp.alt,sp);
-  window.ctx=ctxBak; x.restore();
+  const x=c.getContext('2d');
+  const cor = (S.coresCarro&&S.coresCarro[v.id]) || v.cor;
+  const sp={larg:64,alt:19,roda:12,cor:cor,teto:v.teto,tipo:v.tipo};
+  x.clearRect(0,0,c.width,c.height);
+  x.save(); x.translate(c.width/2, c.height*0.46);
+  desenharFormaCarro(x, sp, [{dx:-sp.larg*0.46,dy:0,comp:0,rot:0},{dx:sp.larg*0.46,dy:0,comp:0,rot:0}]);
+  x.restore();
 }
 // miniatura de mapa
 function desenharMiniMapa(c,m){
@@ -1526,6 +1675,7 @@ window.addEventListener('keyup',e=>{ teclas[e.key.toLowerCase()]=false; aplicarT
 function aplicarTeclado(){
   Jogo.ctrl.gas   = !!(teclas['arrowright']||teclas['d']||teclas['arrowup']||teclas['w']);
   Jogo.ctrl.freio = !!(teclas['arrowleft'] ||teclas['a']||teclas['arrowdown']||teclas['s']);
+  Jogo.ctrl.nitro = !!(teclas[' ']||teclas['shift']);
 }
 
 // Pedais touch / clique
@@ -1539,6 +1689,7 @@ function ligarPedal(el, prop){
 }
 ligarPedal($('#btnGas'),'gas');
 ligarPedal($('#btnFreio'),'freio');
+ligarPedal($('#btnNitro'),'nitro');
 
 // (Os pedais GÁS/FREIO já cobrem o toque; sem atalho extra na tela para
 //  evitar estados "travados" de aceleração.)
