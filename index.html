@@ -658,7 +658,7 @@ const Carro = {
     const k = lv => 1 + lv*0.12;
     this.spec = {
       ref:v,
-      power: v.power * k(S.up.motor) * 4200,
+      power: v.power * k(S.up.motor) * 640,
       grip:  v.grip  * (0.82 + S.up.pneus*0.05),
       peso:  v.peso,
       susp:  v.susp  * (1 + S.up.suspensao*0.10),
@@ -715,26 +715,25 @@ const Carro = {
           qtdNoChao++;
           const inc = Terreno.inclinacao(ax);
           const nx = Math.sin(inc), ny = -Math.cos(inc);    // normal do terreno
-          // força de mola + amortecimento
-          const k = 26 * sp.susp;
-          const damp = 1.6 * sp.susp;
+          // mola da suspensão (empurra o carro para cima do solo)
+          const k = 30 * sp.susp;
+          const damp = 2.0 * sp.susp;
           const velNormal = this.vx*nx + this.vy*ny;
           const forca = (penetra*k - velNormal*damp);
           this.vx += nx*forca*dt;
           this.vy += ny*forca*dt;
-          // torque que alinha o carro à rampa
-          this.vAng += (inc - this.ang) * 4.0 * dt;
-          // atrito lateral (evita deslizar eternamente)
-          this.vx *= (1 - 0.9*dt*sp.grip*0.4);
-          // ---- tração ----
-          if(temGas && i===0){     // só a roda traseira "puxa"
-            const dir = (gas - freio);     // +1 acelera, -1 ré/freio
-            const fx = Math.cos(inc)*dir*sp.power*dt;
-            const fy = Math.sin(inc)*dir*sp.power*dt;
-            this.vx += fx/ (sp.peso*60);
-            this.vy += fy/ (sp.peso*60);
-            // empinar: acelerar gera torque para trás
-            this.vAng -= dir*0.9*dt;
+          // torque que alinha o chassi à inclinação da rampa
+          let dAng = inc - this.ang;
+          while(dAng> Math.PI) dAng-=Math.PI*2;
+          while(dAng<-Math.PI) dAng+=Math.PI*2;
+          this.vAng += dAng * 5.0 * dt;
+          // ---- tração: só a roda traseira (i===0) puxa ----
+          if(temGas && i===0){
+            const dir = (gas - freio);                 // +1 acelera, -1 freia/ré
+            const acel = dir * sp.power / sp.peso * dt; // aceleração ao longo da rampa
+            this.vx += Math.cos(inc) * acel;
+            this.vy += Math.sin(inc) * acel;
+            this.vAng -= dir * 1.1 * dt;                // tende a empinar ao acelerar
           }
         }
       } else { r.comp = lerp(r.comp,0,clamp(dt*8,0,1)); }
@@ -743,12 +742,13 @@ const Carro = {
     }
     this.noChao = qtdNoChao>0;
 
-    // arrasto do ar
-    this.vx *= (1 - 0.18*dt);
-    this.vy *= (1 - 0.05*dt);
+    // resistência: forte no chão (pneu/atrito) e leve no ar — define a velocidade máxima
+    const dragX = this.noChao ? 1.25 : 0.22;
+    this.vx *= (1 - dragX*dt);
+    this.vy *= (1 - 0.30*dt);
     // limites de velocidade angular
     this.vAng = clamp(this.vAng, -7, 7);
-    this.vAng *= (1 - 1.2*dt);
+    this.vAng *= (1 - 1.4*dt);
 
     // integra
     this.x += this.vx*dt;
@@ -1476,18 +1476,8 @@ function ligarPedal(el, prop){
 ligarPedal($('#btnGas'),'gas');
 ligarPedal($('#btnFreio'),'freio');
 
-// Toque na metade da tela também funciona como acelerar/frear (atalho)
-cv.addEventListener('touchstart',e=>{
-  if(Jogo.estado!=='jogando') return;
-  for(const t of e.changedTouches){
-    if(t.clientX > W*0.5) Jogo.ctrl.gas=true; else Jogo.ctrl.freio=true;
-  }
-},{passive:true});
-cv.addEventListener('touchend',e=>{
-  if(Jogo.estado!=='jogando') return;
-  // se não houver mais toques, solta tudo (os pedais reativam ao tocar neles)
-  if(e.touches.length===0){ /* pedais mantêm seus próprios estados */ }
-},{passive:true});
+// (Os pedais GÁS/FREIO já cobrem o toque; sem atalho extra na tela para
+//  evitar estados "travados" de aceleração.)
 
 /* ----------------------------------------------------------------
    23. PAUSA
